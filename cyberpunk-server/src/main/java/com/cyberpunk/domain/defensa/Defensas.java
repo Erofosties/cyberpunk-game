@@ -2,6 +2,9 @@ package com.cyberpunk.domain.defensa;
 
 import jakarta.persistence.*;
 
+import com.cyberpunk.domain.colonia.Colonia;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+
 @Entity
 @Table(name = "defensas")
 public class Defensas {
@@ -11,57 +14,109 @@ public class Defensas {
     private Long id;
 
     private int escudos;
+
     private int torretasNeocromo;
+
     private int canonesHexalium;
+
     private int integridadNave;
 
-    // 🔹 Constructor obligatorio para JPA
+    @OneToOne(mappedBy = "defensas")
+    @JsonBackReference
+    private Colonia colonia;
+
+    // Constructor obligatorio JPA
     public Defensas() {
+        inicializarDefensas();
+    }
+
+    private void inicializarDefensas() {
         this.escudos = 1;
         this.torretasNeocromo = 2;
         this.canonesHexalium = 1;
         this.integridadNave = 100;
     }
 
-    public Long getId() {
-        return id;
-    }
+    // ================= COMBATE =================
 
-    // 🔹 Poder defensivo total
     public int calcularPoderDefensivo() {
+
         int poderEscudos = escudos * 80;
+
         int poderTorretas = torretasNeocromo * 40;
+
         int poderCanones = canonesHexalium * 70;
+
         return poderEscudos + poderTorretas + poderCanones;
     }
 
     public void recibirAtaque(int fuerzaEnemiga) {
+
         int poderDefensa = calcularPoderDefensivo();
 
         if (poderDefensa >= fuerzaEnemiga) {
+
             dañarEstructuras(fuerzaEnemiga / 10);
+
         } else {
+
             int dañoRestante = fuerzaEnemiga - poderDefensa;
+
             integridadNave -= dañoRestante / 5;
-            if (integridadNave < 0) integridadNave = 0;
+
+            if (integridadNave < 0)
+                integridadNave = 0;
+
             dañarEstructuras(fuerzaEnemiga / 5);
         }
     }
 
     private void dañarEstructuras(int impacto) {
-        torretasNeocromo -= impacto / 20;
-        canonesHexalium -= impacto / 25;
 
-        if (torretasNeocromo < 0) torretasNeocromo = 0;
-        if (canonesHexalium < 0) canonesHexalium = 0;
+        int dañoTorretas = Math.max(1, impacto / 20);
+
+        int dañoCanones = Math.max(1, impacto / 25);
+
+        torretasNeocromo -= dañoTorretas;
+
+        canonesHexalium -= dañoCanones;
+
+        if (torretasNeocromo < 0)
+            torretasNeocromo = 0;
+
+        if (canonesHexalium < 0)
+            canonesHexalium = 0;
     }
+
+    // ================= REPARACIÓN =================
 
     public void reparar(int cantidad) {
+
         integridadNave += cantidad;
-        if (integridadNave > 100) integridadNave = 100;
+
+        if (integridadNave > 100)
+            integridadNave = 100;
     }
 
+    // ================= CONSTRUCCIÓN =================
+
     public void construirEscudo() { escudos++; }
+
     public void construirTorreta() { torretasNeocromo++; }
+
     public void construirCanon() { canonesHexalium++; }
+
+    // ================= GETTERS =================
+
+    public Long getId() { return id; }
+
+    public int getEscudos() { return escudos; }
+
+    public int getTorretasNeocromo() { return torretasNeocromo; }
+
+    public int getCanonesHexalium() { return canonesHexalium; }
+
+    public int getIntegridadNave() { return integridadNave; }
+
+    public Colonia getColonia() { return colonia; }
 }

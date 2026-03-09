@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 import com.cyberpunk.domain.edificio.Edificio;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "construcciones")
@@ -12,28 +13,32 @@ public class ConstruccionEnCurso {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private String tipo;
+
     private LocalDateTime tiempoInicio;
+
     private int duracionSegundos;
 
-    // 🔗 Relación con colonia (lado dueño del mappedBy)
     @ManyToOne
     @JoinColumn(name = "colonia_id", nullable = false)
+    @JsonBackReference
     private Colonia colonia;
 
-    // 🔗 Edificio que se está mejorando
     @ManyToOne
     @JoinColumn(name = "edificio_id", nullable = false)
     private Edificio edificio;
 
     private LocalDateTime fechaFin;
 
-    // 🔹 Constructor obligatorio para JPA
+    // Constructor obligatorio JPA
     public ConstruccionEnCurso() {}
+
     public ConstruccionEnCurso(String tipo) {
-    	this.tipo = tipo;
-    	this.tiempoInicio = LocalDateTime.now();
-    	this.duracionSegundos = 60;
+        this.tipo = tipo;
+        this.tiempoInicio = LocalDateTime.now();
+        this.duracionSegundos = 60;
+        this.fechaFin = tiempoInicio.plusSeconds(duracionSegundos);
     }
 
     public ConstruccionEnCurso(
@@ -46,17 +51,19 @@ public class ConstruccionEnCurso {
         this.edificio = edificio;
 
         double reduccion = 1 - (techiesAsignados * 0.05);
-        if (reduccion < 0.5) reduccion = 0.5; // máximo 50% reducción
+        if (reduccion < 0.5) reduccion = 0.5;
 
         int segundosFinal = (int) (segundosBase * reduccion);
 
-        this.fechaFin = LocalDateTime.now().plusSeconds(segundosFinal);
+        this.tiempoInicio = LocalDateTime.now();
+        this.duracionSegundos = segundosFinal;
+        this.fechaFin = tiempoInicio.plusSeconds(segundosFinal);
     }
 
+    // ================= LÓGICA =================
+
     public boolean finalizada() {
-        return LocalDateTime.now().isAfter(
-            tiempoInicio.plusSeconds(duracionSegundos)
-        );
+        return LocalDateTime.now().isAfter(fechaFin);
     }
 
     public void completar() {
@@ -73,11 +80,15 @@ public class ConstruccionEnCurso {
 
     public LocalDateTime getFechaFin() { return fechaFin; }
 
+    public LocalDateTime getTiempoInicio() { return tiempoInicio; }
+
+    // ================= SETTERS =================
+
     public void setColonia(Colonia colonia) {
         this.colonia = colonia;
     }
+
     public void setEdificio(Edificio edificio) {
         this.edificio = edificio;
     }
-    
 }

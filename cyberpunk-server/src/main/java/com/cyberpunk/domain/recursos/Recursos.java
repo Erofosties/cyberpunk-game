@@ -42,6 +42,13 @@ public class Recursos {
 
     public Recursos() {
         this.ultimoCalculo = System.currentTimeMillis();
+        
+        //recursos iniciales
+        this.neocromo = 1000;
+        this.umbrium = 300;
+        this.kromafruta = 1000;
+        this.algacarne = 300;
+        this.nanocura =5;
     }
 
     public Long getId() {
@@ -56,16 +63,19 @@ public class Recursos {
         long segundos = (ahora - ultimoCalculo) / 1000;
 
         if (segundos <= 0) return;
-    	double factorEnergia = colonia.calcularFactorEnergia();
+
+        double factorEnergia = colonia.calcularFactorEnergia();
 
         for (Edificio edificio : colonia.getEdificios()) {
 
+            int produccion = edificio.producir(factorEnergia);
 
-        	int produccion = edificio.producir(factorEnergia);
             ResourceType recurso = edificio.getRecursoProduce();
 
             if (recurso != null && produccion > 0) {
-                add(recurso, produccion * (int) segundos);
+
+                add(recurso, produccion * (int)segundos);
+
             }
         }
 
@@ -136,7 +146,9 @@ public class Recursos {
         for (var entry : coste.entrySet()) {
 
             if (getCantidad(entry.getKey()) < entry.getValue()) {
+
                 return false;
+
             }
 
         }
@@ -147,8 +159,11 @@ public class Recursos {
     public void consumir(Map<ResourceType, Integer> coste) {
 
         for (var entry : coste.entrySet()) {
+
             consumir(entry.getKey(), entry.getValue());
+
         }
+
     }
 
     public void consumir(ResourceType type, int amount) {
@@ -170,6 +185,7 @@ public class Recursos {
             case SOMNEX -> somnex = Math.max(0, somnex - amount);
             case ENERGIA -> energia = Math.max(0, energia - amount);
             case EXPLORACION -> exploracion = Math.max(0, exploracion - amount);
+
         }
     }
 
@@ -182,5 +198,6 @@ public class Recursos {
         REFLEXA, NANOCURA, SOMNEX,
         EXPLORACION,
         ENERGIA
+
     }
 }

@@ -2,14 +2,13 @@ package com.cyberpunk.domain.edificio;
 
 import jakarta.persistence.*;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.domain.personaje.Trabajador.Profession;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "edificios")
@@ -26,6 +25,7 @@ public class Edificio {
     private ResourceType recursoProduce;
 
     private int nivel;
+
     private int vidaEstructural;
 
     private int consumoEnergiaBase;
@@ -33,43 +33,54 @@ public class Edificio {
 
     @ManyToOne
     @JoinColumn(name = "colonia_id")
+    @JsonBackReference
     private Colonia colonia;
 
-    @OneToMany
-    @JoinColumn(name = "edificio_id")
+    @OneToMany(mappedBy = "edificio")
     private List<Trabajador> trabajadores = new ArrayList<>();
 
     public Edificio() {}
 
     public Edificio(TipoEdificio tipo) {
+
         this.tipo = tipo;
+
         this.nivel = nivelInicialPorTipo(tipo);
+
         this.vidaEstructural = 100;
+
         this.recursoProduce = mapTipoToRecurso(tipo);
+
         configurarEnergia();
     }
 
     public enum TipoEdificio {
+
         MINA_NEOCROMO,
         MINA_UMBRIUM,
         MINA_SYNTHERIUM,
         MINA_HEXALIUM,
         MINA_VOIDIUM,
+
         GRANJA_KROMAFRUTA,
         GRANJA_NEUROTRIGO,
         GRANJA_ALGACARNE,
         CRIADERO_RATAX,
         CULTIVO_FLORSOMNIO,
+
         LAB_REFLEXA,
         LAB_NANOCURA,
         LAB_SOMNEX,
+
         PLACA_SOLAR,
         REACTOR_FUSION,
         GENERADOR_NEON
     }
 
     private static int nivelInicialPorTipo(TipoEdificio tipo) {
+
         return switch (tipo) {
+
             case MINA_NEOCROMO,
                  MINA_UMBRIUM,
                  MINA_SYNTHERIUM,
@@ -81,15 +92,21 @@ public class Edificio {
     }
 
     private void configurarEnergia() {
+
         switch (tipo) {
+
             case PLACA_SOLAR -> produccionEnergiaBase = 30;
+
             case REACTOR_FUSION -> produccionEnergiaBase = 70;
+
             case GENERADOR_NEON -> produccionEnergiaBase = 50;
+
             default -> consumoEnergiaBase = 15;
         }
     }
 
     private ResourceType mapTipoToRecurso(TipoEdificio tipo) {
+
         return switch (tipo) {
 
             case MINA_NEOCROMO -> ResourceType.NEOCROMO;
@@ -114,10 +131,13 @@ public class Edificio {
         };
     }
 
+    // ================= PRODUCCIÓN =================
+
     public int producir(double factorEnergia) {
 
         if (nivel == 0) return 0;
-        if (esEdificioEnergetico()) return 0;
+
+        if (esEnergetico()) return 0;
 
         int total = 0;
 
@@ -133,7 +153,10 @@ public class Edificio {
         return (int) Math.round(total * bonusNivel * factorEnergia);
     }
 
-    private boolean esEdificioEnergetico() {
+    // ================= ENERGÍA =================
+
+    public boolean esEnergetico() {
+
         return tipo == TipoEdificio.PLACA_SOLAR
                 || tipo == TipoEdificio.REACTOR_FUSION
                 || tipo == TipoEdificio.GENERADOR_NEON;
@@ -141,7 +164,7 @@ public class Edificio {
 
     public int getProduccionEnergia() {
 
-        if (!esEdificioEnergetico()) return 0;
+        if (!esEnergetico()) return 0;
 
         int techiesAsignados = trabajadores.size();
 
@@ -156,10 +179,14 @@ public class Edificio {
     }
 
     public int getConsumoEnergia() {
+
         return (int)(consumoEnergiaBase * nivel * Math.pow(1.08, nivel));
     }
 
+    // ================= NIVEL =================
+
     public void subirNivel() {
+
         if (nivel < getNivelMaximo())
             nivel++;
     }
@@ -181,6 +208,8 @@ public class Edificio {
         };
     }
 
+    // ================= TRABAJADORES =================
+
     public boolean addTrabajador(Trabajador t) {
 
         if (!profesionCompatible(t.getProfession()))
@@ -192,67 +221,8 @@ public class Edificio {
     }
 
     public void removeTrabajador(Trabajador t) {
+
         trabajadores.remove(t);
-    }
-
-    public Map<ResourceType, Integer> costeSiguienteNivel() {
-
-        Map<ResourceType, Integer> coste = new EnumMap<>(ResourceType.class);
-
-        int nivelSiguiente = nivel + 1;
-
-        switch (tipo) {
-
-            case MINA_NEOCROMO ->
-                    coste.put(ResourceType.NEOCROMO, (int)(100 * Math.pow(1.8, nivelSiguiente)));
-
-            case MINA_UMBRIUM ->
-                    coste.put(ResourceType.UMBRIUM, (int)(120 * Math.pow(1.8, nivelSiguiente)));
-
-            case MINA_SYNTHERIUM ->
-                    coste.put(ResourceType.SYNTHERIUM, (int)(140 * Math.pow(1.8, nivelSiguiente)));
-
-            case MINA_HEXALIUM ->
-                    coste.put(ResourceType.HEXALIUM, (int)(160 * Math.pow(1.8, nivelSiguiente)));
-
-            case MINA_VOIDIUM ->
-                    coste.put(ResourceType.VOIDIUM, (int)(200 * Math.pow(1.8, nivelSiguiente)));
-
-            case GRANJA_KROMAFRUTA ->
-                    coste.put(ResourceType.KROMAFRUTA, (int)(80 * Math.pow(1.6, nivelSiguiente)));
-
-            case GRANJA_NEUROTRIGO ->
-                    coste.put(ResourceType.NEUROTRIGO, (int)(80 * Math.pow(1.6, nivelSiguiente)));
-
-            case GRANJA_ALGACARNE ->
-                    coste.put(ResourceType.ALGACARNE, (int)(90 * Math.pow(1.6, nivelSiguiente)));
-
-            case CRIADERO_RATAX ->
-                    coste.put(ResourceType.RATAX, (int)(100 * Math.pow(1.6, nivelSiguiente)));
-
-            case CULTIVO_FLORSOMNIO ->
-                    coste.put(ResourceType.FLORSOMNIO, (int)(110 * Math.pow(1.6, nivelSiguiente)));
-
-            case LAB_REFLEXA ->
-                    coste.put(ResourceType.REFLEXA, (int)(150 * Math.pow(1.7, nivelSiguiente)));
-
-            case LAB_NANOCURA ->
-                    coste.put(ResourceType.NANOCURA, (int)(150 * Math.pow(1.7, nivelSiguiente)));
-
-            case LAB_SOMNEX ->
-                    coste.put(ResourceType.SOMNEX, (int)(170 * Math.pow(1.7, nivelSiguiente)));
-
-            case PLACA_SOLAR ->
-                    coste.put(ResourceType.NEOCROMO, (int)(150 * Math.pow(1.7, nivelSiguiente)));
-
-            case REACTOR_FUSION ->
-                    coste.put(ResourceType.SYNTHERIUM, (int)(200 * Math.pow(1.7, nivelSiguiente)));
-
-            case GENERADOR_NEON ->
-                    coste.put(ResourceType.HEXALIUM, (int)(180 * Math.pow(1.7, nivelSiguiente)));
-        }
-
-        return coste;
     }
 
     private boolean profesionCompatible(Profession p) {
@@ -282,6 +252,8 @@ public class Edificio {
             default -> false;
         };
     }
+
+    // ================= GETTERS =================
 
     public Long getId() { return id; }
 

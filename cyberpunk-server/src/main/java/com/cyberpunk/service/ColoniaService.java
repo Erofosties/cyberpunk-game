@@ -16,7 +16,10 @@ public class ColoniaService {
     public ColoniaService(ColoniaRepository coloniaRepository) {
         this.coloniaRepository = coloniaRepository;
     }
-
+    public Colonia obtenerColonia(Long id) {
+        return coloniaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Colonia no encontrada"));
+    }
     public void procesarConstrucciones(Long coloniaId) {
 
         Colonia colonia = coloniaRepository.findById(coloniaId).orElseThrow();

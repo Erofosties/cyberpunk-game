@@ -16,14 +16,32 @@ public class CosteEdificioCalculator {
 
         Map<ResourceType, Integer> coste = new EnumMap<>(ResourceType.class);
 
-        int baseMetal = 100;
-        int baseSecundario = 60;
+        int base = switch (tipo) {
 
-        int costeMetal = (int) (baseMetal * Math.pow(FACTOR_COSTE, nivelActual));
-        int costeSec = (int) (baseSecundario * Math.pow(FACTOR_COSTE, nivelActual));
+            case MINA_NEOCROMO -> 100;
+            case MINA_UMBRIUM -> 120;
+            case MINA_SYNTHERIUM -> 140;
+            case MINA_HEXALIUM -> 160;
+            case MINA_VOIDIUM -> 200;
 
-        coste.put(ResourceType.NEOCROMO, costeMetal);
-        coste.put(ResourceType.UMBRIUM, costeSec);
+            case GRANJA_KROMAFRUTA -> 80;
+            case GRANJA_NEUROTRIGO -> 80;
+            case GRANJA_ALGACARNE -> 90;
+            case CRIADERO_RATAX -> 100;
+            case CULTIVO_FLORSOMNIO -> 110;
+
+            case LAB_REFLEXA -> 150;
+            case LAB_NANOCURA -> 150;
+            case LAB_SOMNEX -> 170;
+
+            case PLACA_SOLAR -> 150;
+            case REACTOR_FUSION -> 200;
+            case GENERADOR_NEON -> 180;
+        };
+
+        int costeFinal = (int)(base * Math.pow(FACTOR_COSTE, nivelActual));
+
+        coste.put(ResourceType.NEOCROMO, costeFinal);
 
         return coste;
     }
@@ -32,6 +50,6 @@ public class CosteEdificioCalculator {
 
         int baseTiempo = 60;
 
-        return (int) (baseTiempo * Math.pow(FACTOR_TIEMPO, nivelActual));
+        return (int)(baseTiempo * Math.pow(FACTOR_TIEMPO, nivelActual));
     }
 }

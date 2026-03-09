@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
 import com.cyberpunk.domain.usuario.Usuario;
+import com.cyberpunk.dto.CrearUsuarioRequest;
 import com.cyberpunk.service.UsuarioService;
 
 @RestController
@@ -18,8 +19,12 @@ public class UsuarioController {
     }
 
     @PostMapping
-    public Usuario crearUsuario(@RequestParam String username, @RequestParam String password) {
-        return usuarioService.crearUsuario(username, password);
+    public Usuario crearUsuario(@RequestBody CrearUsuarioRequest request) {
+
+        return usuarioService.crearUsuario(
+                request.getUsername(),
+                request.getPassword()
+        );
     }
 
     @GetMapping
