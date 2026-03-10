@@ -120,6 +120,13 @@ public abstract class Personaje {
     public void setColonia(Colonia colonia) {
         this.colonia = colonia;
     }
+    public void setEdificioAsignado(Edificio edificioAsignado) {
+        this.edificioAsignado = edificioAsignado;
+    }
+
+    public void setConstruccionAsignada(ConstruccionEnCurso construccionAsignada) {
+        this.construccionAsignada = construccionAsignada;
+    }
 
     // ================= PRODUCCIÓN =================
 
