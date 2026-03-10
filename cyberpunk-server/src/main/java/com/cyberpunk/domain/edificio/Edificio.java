@@ -1,11 +1,9 @@
 package com.cyberpunk.domain.edificio;
 
 import jakarta.persistence.*;
-import java.util.ArrayList;
 import java.util.List;
 
 import com.cyberpunk.domain.colonia.Colonia;
-import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
@@ -28,15 +26,13 @@ public class Edificio {
     private int vidaEstructural;
 
     private int consumoEnergiaBase;
+
     private int produccionEnergiaBase;
 
     @ManyToOne
     @JoinColumn(name = "colonia_id")
     @JsonBackReference
     private Colonia colonia;
-
-    @OneToMany(mappedBy = "edificio")
-    private List<Trabajador> trabajadores = new ArrayList<>();
 
     public Edificio() {}
 
@@ -49,6 +45,8 @@ public class Edificio {
 
         configurarEnergia();
     }
+
+    // ================= TIPOS =================
 
     public enum TipoEdificio {
 
@@ -73,6 +71,8 @@ public class Edificio {
         GENERADOR_NEON
     }
 
+    // ================= NIVEL INICIAL =================
+
     private static int nivelInicialPorTipo(TipoEdificio tipo) {
 
         return switch (tipo) {
@@ -87,17 +87,23 @@ public class Edificio {
         };
     }
 
+    // ================= CONFIGURACIÓN ENERGÍA =================
+
     private void configurarEnergia() {
 
         switch (tipo) {
 
             case PLACA_SOLAR -> produccionEnergiaBase = 30;
+
             case REACTOR_FUSION -> produccionEnergiaBase = 70;
+
             case GENERADOR_NEON -> produccionEnergiaBase = 50;
 
             default -> consumoEnergiaBase = 15;
         }
     }
+
+    // ================= MAPEO RECURSOS =================
 
     private ResourceType mapTipoToRecurso(TipoEdificio tipo) {
 
@@ -127,24 +133,15 @@ public class Edificio {
 
     // ================= PRODUCCIÓN =================
 
-    public int producir(double factorEnergia) {
+    public int producir(int produccionTrabajadores, double factorEnergia) {
 
         if (nivel == 0) return 0;
 
         if (esEnergetico()) return 0;
 
-        int total = 0;
-
-        for (Trabajador t : trabajadores) {
-
-            int base = t.getProduccion();
-
-            total += base;
-        }
-
         double bonusNivel = nivel * Math.pow(1.1, nivel);
 
-        return (int) Math.round(total * bonusNivel * factorEnergia);
+        return (int) Math.round(produccionTrabajadores * bonusNivel * factorEnergia);
     }
 
     // ================= ENERGÍA =================
@@ -156,11 +153,9 @@ public class Edificio {
                 || tipo == TipoEdificio.GENERADOR_NEON;
     }
 
-    public int getProduccionEnergia() {
+    public int getProduccionEnergia(int trabajadoresAsignados) {
 
         if (!esEnergetico()) return 0;
-
-        int trabajadoresAsignados = trabajadores.size();
 
         double bonus = 1 + (trabajadoresAsignados * 0.15);
 
@@ -181,8 +176,9 @@ public class Edificio {
 
     public void subirNivel() {
 
-        if (nivel < getNivelMaximo())
+        if (nivel < getNivelMaximo()) {
             nivel++;
+        }
     }
 
     public int getNivelMaximo() {
@@ -202,33 +198,25 @@ public class Edificio {
         };
     }
 
-    // ================= TRABAJADORES =================
-
-    public void addTrabajador(Trabajador t) {
-
-        trabajadores.add(t);
-
-        t.setEdificio(this);
-    }
-
-    public void removeTrabajador(Trabajador t) {
-
-        trabajadores.remove(t);
-
-        t.setEdificio(null);
-    }
-
     // ================= GETTERS =================
 
-    public Long getId() { return id; }
+    public Long getId() {
+        return id;
+    }
 
-    public TipoEdificio getTipo() { return tipo; }
+    public TipoEdificio getTipo() {
+        return tipo;
+    }
 
-    public int getNivel() { return nivel; }
+    public int getNivel() {
+        return nivel;
+    }
 
-    public ResourceType getRecursoProduce() { return recursoProduce; }
+    public ResourceType getRecursoProduce() {
+        return recursoProduce;
+    }
 
-    public List<Trabajador> getTrabajadores() { return trabajadores; }
-
-    public void setColonia(Colonia colonia) { this.colonia = colonia; }
+    public void setColonia(Colonia colonia) {
+        this.colonia = colonia;
+    }
 }

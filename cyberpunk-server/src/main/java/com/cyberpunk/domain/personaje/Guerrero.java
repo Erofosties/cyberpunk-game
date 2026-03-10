@@ -3,21 +3,25 @@ package com.cyberpunk.domain.personaje;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name="guerreros")
+@Table(name = "guerreros")
 public class Guerrero extends Personaje {
 
     private int fuerza;
-
     private int destreza;
-
     private int resistencia;
-
     private int hackeo;
 
-    public Guerrero(){}
+    // Constructor JPA
+    public Guerrero() {}
 
-    public Guerrero(String nombre,int fuerza,int destreza,int resistencia,int hackeo){
-        super(nombre,120);
+    public Guerrero(
+            String nombre,
+            int fuerza,
+            int destreza,
+            int resistencia,
+            int hackeo) {
+
+        super(nombre, 120);
 
         this.fuerza = fuerza;
         this.destreza = destreza;
@@ -25,28 +29,31 @@ public class Guerrero extends Personaje {
         this.hackeo = hackeo;
     }
 
-    public int poderCombate(){
+    // ================= PRODUCCIÓN =================
 
-        if(!puedeActuar()) return 0;
-
-        aumentarCansancio(6);
-        consumirHambre(3);
-
-        return fuerza + destreza + resistencia + hackeo;
-    }
+    // Los guerreros no producen recursos
 
     @Override
-    public int getProduccion(){
+    public int getProduccion() {
         return 0;
     }
 
-    // GETTERS
+    // ================= GETTERS =================
 
-    public int getFuerza(){ return fuerza; }
+    public int getFuerza() {
+        return fuerza;
+    }
 
-    public int getDestreza(){ return destreza; }
+    public int getDestreza() {
+        return destreza;
+    }
 
-    public int getResistencia(){ return resistencia; }
+    public int getResistencia() {
+        return resistencia;
+    }
 
-    public int getHackeo(){ return hackeo; }
+    public int getHackeo() {
+        return hackeo;
+    }
+
 }

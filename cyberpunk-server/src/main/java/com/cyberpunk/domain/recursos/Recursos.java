@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import java.util.Map;
 import java.util.EnumMap;
 
-import com.cyberpunk.domain.colonia.Colonia;
-import com.cyberpunk.domain.edificio.Edificio;
-
 @Entity
 @Table(name = "recursos")
 public class Recursos {
@@ -41,45 +38,19 @@ public class Recursos {
     private int exploracion;
 
     public Recursos() {
+
         this.ultimoCalculo = System.currentTimeMillis();
-        
-        //recursos iniciales
+
+        // recursos iniciales
         this.neocromo = 1000;
         this.umbrium = 300;
         this.kromafruta = 1000;
         this.algacarne = 300;
-        this.nanocura =5;
+        this.nanocura = 5;
     }
 
     public Long getId() {
         return id;
-    }
-
-    // ================= PRODUCCIÓN =================
-
-    public void producirRecursos(Colonia colonia) {
-
-        long ahora = System.currentTimeMillis();
-        long segundos = (ahora - ultimoCalculo) / 1000;
-
-        if (segundos <= 0) return;
-
-        double factorEnergia = colonia.calcularFactorEnergia();
-
-        for (Edificio edificio : colonia.getEdificios()) {
-
-            int produccion = edificio.producir(factorEnergia);
-
-            ResourceType recurso = edificio.getRecursoProduce();
-
-            if (recurso != null && produccion > 0) {
-
-                add(recurso, produccion * (int)segundos);
-
-            }
-        }
-
-        ultimoCalculo = ahora;
     }
 
     // ================= MÉTODOS DE JUEGO =================
@@ -89,19 +60,23 @@ public class Recursos {
         if (amount <= 0) return;
 
         switch (type) {
+
             case NEOCROMO -> neocromo += amount;
             case UMBRIUM -> umbrium += amount;
             case SYNTHERIUM -> syntherium += amount;
             case HEXALIUM -> hexalium += amount;
             case VOIDIUM -> voidium += amount;
+
             case KROMAFRUTA -> kromafruta += amount;
             case ALGACARNE -> algacarne += amount;
             case NEUROTRIGO -> neurotrigo += amount;
             case RATAX -> ratax += amount;
             case FLORSOMNIO -> florsomnio += amount;
+
             case REFLEXA -> reflexa += amount;
             case NANOCURA -> nanocura += amount;
             case SOMNEX -> somnex += amount;
+
             case ENERGIA -> energia += amount;
             case EXPLORACION -> exploracion += amount;
         }
@@ -121,19 +96,23 @@ public class Recursos {
     public int getCantidad(ResourceType type) {
 
         return switch (type) {
+
             case NEOCROMO -> neocromo;
             case UMBRIUM -> umbrium;
             case SYNTHERIUM -> syntherium;
             case HEXALIUM -> hexalium;
             case VOIDIUM -> voidium;
+
             case KROMAFRUTA -> kromafruta;
             case ALGACARNE -> algacarne;
             case NEUROTRIGO -> neurotrigo;
             case RATAX -> ratax;
             case FLORSOMNIO -> florsomnio;
+
             case REFLEXA -> reflexa;
             case NANOCURA -> nanocura;
             case SOMNEX -> somnex;
+
             case ENERGIA -> energia;
             case EXPLORACION -> exploracion;
         };
@@ -146,11 +125,8 @@ public class Recursos {
         for (var entry : coste.entrySet()) {
 
             if (getCantidad(entry.getKey()) < entry.getValue()) {
-
                 return false;
-
             }
-
         }
 
         return true;
@@ -159,11 +135,8 @@ public class Recursos {
     public void consumir(Map<ResourceType, Integer> coste) {
 
         for (var entry : coste.entrySet()) {
-
             consumir(entry.getKey(), entry.getValue());
-
         }
-
     }
 
     public void consumir(ResourceType type, int amount) {
@@ -175,17 +148,19 @@ public class Recursos {
             case SYNTHERIUM -> syntherium = Math.max(0, syntherium - amount);
             case HEXALIUM -> hexalium = Math.max(0, hexalium - amount);
             case VOIDIUM -> voidium = Math.max(0, voidium - amount);
+
             case KROMAFRUTA -> kromafruta = Math.max(0, kromafruta - amount);
             case ALGACARNE -> algacarne = Math.max(0, algacarne - amount);
             case NEUROTRIGO -> neurotrigo = Math.max(0, neurotrigo - amount);
             case RATAX -> ratax = Math.max(0, ratax - amount);
             case FLORSOMNIO -> florsomnio = Math.max(0, florsomnio - amount);
+
             case REFLEXA -> reflexa = Math.max(0, reflexa - amount);
             case NANOCURA -> nanocura = Math.max(0, nanocura - amount);
             case SOMNEX -> somnex = Math.max(0, somnex - amount);
+
             case ENERGIA -> energia = Math.max(0, energia - amount);
             case EXPLORACION -> exploracion = Math.max(0, exploracion - amount);
-
         }
     }
 
@@ -198,6 +173,5 @@ public class Recursos {
         REFLEXA, NANOCURA, SOMNEX,
         EXPLORACION,
         ENERGIA
-
     }
 }

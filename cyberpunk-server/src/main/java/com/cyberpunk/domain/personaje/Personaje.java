@@ -1,6 +1,7 @@
 package com.cyberpunk.domain.personaje;
 
 import com.cyberpunk.domain.colonia.Colonia;
+import com.cyberpunk.domain.tarea.Tarea;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 import jakarta.persistence.*;
@@ -18,66 +19,107 @@ public abstract class Personaje {
 
     private int vida;
 
-    // NUEVO
-    private int hambre;
+    private int hambre = 100;
 
-    private int cansancio;
+    private int cansancio = 0;
 
     @ManyToOne
     @JoinColumn(name = "colonia_id")
     @JsonBackReference
     private Colonia colonia;
 
+    @ManyToOne
+    @JoinColumn(name = "tarea_id")
+    private Tarea tareaActual;
+
     public Personaje() {}
 
     public Personaje(String nombre, int vida) {
         this.nombre = nombre;
         this.vida = vida;
-        this.hambre = 100;
-        this.cansancio = 0;
     }
 
-    // ===== SISTEMA DE ESTADO =====
+    // ================= CANSANCIO =================
 
-    public void aumentarCansancio(int cantidad){
+    public void aumentarCansancio(int cantidad) {
+
         cansancio += cantidad;
-        if(cansancio > 100) cansancio = 100;
+
+        if (cansancio > 100) {
+            cansancio = 100;
+        }
     }
 
-    public void descansar(){
-        cansancio -= 10;
-        if(cansancio < 0) cansancio = 0;
+    public void reducirCansancio(int cantidad) {
+
+        cansancio -= cantidad;
+
+        if (cansancio < 0) {
+            cansancio = 0;
+        }
     }
 
-    public void consumirHambre(int cantidad){
+    // ================= HAMBRE =================
+
+    public void reducirHambre(int cantidad) {
+
         hambre -= cantidad;
-        if(hambre < 0) hambre = 0;
+
+        if (hambre < 0) {
+            hambre = 0;
+        }
     }
 
-    public void comer(int comida){
-        hambre += comida;
-        if(hambre > 100) hambre = 100;
+    public void comer(int cantidad) {
+
+        hambre += cantidad;
+
+        if (hambre > 100) {
+            hambre = 100;
+        }
     }
 
-    public boolean puedeActuar(){
-        return hambre > 0 && cansancio < 100;
+    // ================= GETTERS =================
+
+    public Long getId() {
+        return id;
     }
 
-    // ===== GETTERS =====
+    public String getNombre() {
+        return nombre;
+    }
 
-    public Long getId() { return id; }
+    public int getVida() {
+        return vida;
+    }
 
-    public String getNombre() { return nombre; }
+    public int getHambre() {
+        return hambre;
+    }
 
-    public int getVida() { return vida; }
+    public int getCansancio() {
+        return cansancio;
+    }
 
-    public int getHambre() { return hambre; }
+    public Colonia getColonia() {
+        return colonia;
+    }
 
-    public int getCansancio() { return cansancio; }
+    public Tarea getTareaActual() {
+        return tareaActual;
+    }
 
-    public Colonia getColonia() { return colonia; }
+    // ================= SETTERS =================
 
-    public void setColonia(Colonia colonia) { this.colonia = colonia; }
+    public void setColonia(Colonia colonia) {
+        this.colonia = colonia;
+    }
+
+    public void setTareaActual(Tarea tareaActual) {
+        this.tareaActual = tareaActual;
+    }
+
+    // ================= PRODUCCIÓN =================
 
     public abstract int getProduccion();
 }

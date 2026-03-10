@@ -66,19 +66,12 @@ public class Colonia {
     // ================= GETTERS =================
 
     public Long getId() { return id; }
-
     public String getNombre() { return nombre; }
-
     public Usuario getUsuario() { return usuario; }
-
     public List<Personaje> getPoblacion() { return poblacion; }
-
     public List<Edificio> getEdificios() { return edificios; }
-
     public Recursos getRecursos() { return recursos; }
-
     public Defensas getDefensas() { return defensas; }
-
     public List<ConstruccionEnCurso> getColaConstruccion() { return colaConstruccion; }
 
     // ================= RELACIONES =================
@@ -98,9 +91,7 @@ public class Colonia {
     }
 
     public void addConstruccion(ConstruccionEnCurso construccion) {
-
         colaConstruccion.add(construccion);
-
         construccion.setColonia(this);
     }
 
@@ -109,12 +100,12 @@ public class Colonia {
     public double calcularFactorEnergia() {
 
         int produccion = 0;
-
         int consumo = 0;
 
         for (Edificio e : edificios) {
 
-            produccion += e.getProduccionEnergia();
+            // de momento sin trabajadores asignados
+            produccion += e.getProduccionEnergia(0);
 
             consumo += e.getConsumoEnergia();
         }
@@ -150,7 +141,6 @@ public class Colonia {
             }
 
             if (progreso > 0) {
-
                 c.avanzarConstruccion(progreso);
             }
 
@@ -177,16 +167,23 @@ public class Colonia {
 
         for (Edificio e : edificios) {
 
-            for (Trabajador t : e.getTrabajadores()) {
+            int produccionTrabajadores = 0;
 
-                if (t.getCansancio() >= 100) continue;
+            for (Personaje p : poblacion) {
 
-                int produccion = e.producir(factorEnergia);
+                if (p instanceof Trabajador t) {
 
-                recursos.add(e.getRecursoProduce(), produccion);
+                    if (t.getCansancio() >= 100) continue;
 
-                t.aumentarCansancio(1);
+                    produccionTrabajadores += t.getProduccion();
+
+                    t.aumentarCansancio(1);
+                }
             }
+
+            int produccion = e.producir(produccionTrabajadores, factorEnergia);
+
+            recursos.add(e.getRecursoProduce(), produccion);
         }
     }
 }
