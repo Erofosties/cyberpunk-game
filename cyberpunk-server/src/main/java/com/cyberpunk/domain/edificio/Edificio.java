@@ -6,7 +6,6 @@ import java.util.List;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.personaje.Trabajador;
-import com.cyberpunk.domain.personaje.Trabajador.Profession;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
@@ -44,11 +43,8 @@ public class Edificio {
     public Edificio(TipoEdificio tipo) {
 
         this.tipo = tipo;
-
         this.nivel = nivelInicialPorTipo(tipo);
-
         this.vidaEstructural = 100;
-
         this.recursoProduce = mapTipoToRecurso(tipo);
 
         configurarEnergia();
@@ -96,9 +92,7 @@ public class Edificio {
         switch (tipo) {
 
             case PLACA_SOLAR -> produccionEnergiaBase = 30;
-
             case REACTOR_FUSION -> produccionEnergiaBase = 70;
-
             case GENERADOR_NEON -> produccionEnergiaBase = 50;
 
             default -> consumoEnergiaBase = 15;
@@ -145,7 +139,7 @@ public class Edificio {
 
             int base = t.getProduccion();
 
-            total += profesionCompatible(t.getProfession()) ? base : base / 2;
+            total += base;
         }
 
         double bonusNivel = nivel * Math.pow(1.1, nivel);
@@ -166,15 +160,15 @@ public class Edificio {
 
         if (!esEnergetico()) return 0;
 
-        int techiesAsignados = trabajadores.size();
+        int trabajadoresAsignados = trabajadores.size();
 
-        double bonusTechies = 1 + (techiesAsignados * 0.15);
+        double bonus = 1 + (trabajadoresAsignados * 0.15);
 
         return (int)(
                 produccionEnergiaBase
                         * nivel
                         * Math.pow(1.05, nivel)
-                        * bonusTechies
+                        * bonus
         );
     }
 
@@ -210,47 +204,18 @@ public class Edificio {
 
     // ================= TRABAJADORES =================
 
-    public boolean addTrabajador(Trabajador t) {
-
-        if (!profesionCompatible(t.getProfession()))
-            return false;
+    public void addTrabajador(Trabajador t) {
 
         trabajadores.add(t);
 
-        return true;
+        t.setEdificio(this);
     }
 
     public void removeTrabajador(Trabajador t) {
 
         trabajadores.remove(t);
-    }
 
-    private boolean profesionCompatible(Profession p) {
-
-        return switch (tipo) {
-
-            case MINA_NEOCROMO,
-                 MINA_UMBRIUM,
-                 MINA_SYNTHERIUM,
-                 MINA_HEXALIUM,
-                 MINA_VOIDIUM -> p == Profession.GRINDER;
-
-            case GRANJA_KROMAFRUTA,
-                 GRANJA_NEUROTRIGO,
-                 GRANJA_ALGACARNE,
-                 CRIADERO_RATAX,
-                 CULTIVO_FLORSOMNIO -> p == Profession.AGROTECH;
-
-            case LAB_REFLEXA,
-                 LAB_NANOCURA,
-                 LAB_SOMNEX -> p == Profession.FIXER;
-
-            case PLACA_SOLAR,
-                 REACTOR_FUSION,
-                 GENERADOR_NEON -> p == Profession.TECHIES;
-
-            default -> false;
-        };
+        t.setEdificio(null);
     }
 
     // ================= GETTERS =================

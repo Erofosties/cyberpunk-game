@@ -24,13 +24,13 @@ public class GameEngine {
 
         for (Colonia colonia : colonias) {
 
-            colonia.getRecursos().producirRecursos(colonia);
-
             colonia.procesarConstrucciones();
+
+            colonia.producirRecursos();
         }
 
         coloniaRepository.saveAll(colonias);
 
-        System.out.println("Motor del juego ejecutado");
+        System.out.println("Tick del juego ejecutado");
     }
 }

@@ -1,14 +1,18 @@
-package com.cyberpunk.domain.colonia; 
+package com.cyberpunk.domain.colonia;
 
-import jakarta.persistence.*; 
-import java.util.ArrayList; 
-import java.util.LinkedList; 
-import java.util.List; 
-import com.cyberpunk.domain.defensa.Defensas; 
-import com.cyberpunk.domain.edificio.Edificio; 
-import com.cyberpunk.domain.personaje.Personaje; 
-import com.cyberpunk.domain.recursos.Recursos; 
-import com.cyberpunk.domain.usuario.Usuario; 
+import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+
+import com.cyberpunk.domain.defensa.Defensas;
+import com.cyberpunk.domain.edificio.Edificio;
+import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
+import com.cyberpunk.domain.personaje.Personaje;
+import com.cyberpunk.domain.personaje.Trabajador;
+import com.cyberpunk.domain.recursos.Recursos;
+import com.cyberpunk.domain.usuario.Usuario;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
@@ -28,6 +32,7 @@ public class Colonia {
     private Usuario usuario;
 
     @OneToMany(mappedBy = "colonia", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     private List<Personaje> poblacion = new ArrayList<>();
 
     @OneToMany(mappedBy = "colonia", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -38,7 +43,6 @@ public class Colonia {
     @JoinColumn(name = "recursos_id")
     private Recursos recursos;
 
-    
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "defensas_id")
     @JsonManagedReference
@@ -48,7 +52,6 @@ public class Colonia {
     @JsonManagedReference
     private List<ConstruccionEnCurso> colaConstruccion = new LinkedList<>();
 
-    // JPA
     public Colonia() {
         this.recursos = new Recursos();
         this.defensas = new Defensas();
@@ -63,12 +66,19 @@ public class Colonia {
     // ================= GETTERS =================
 
     public Long getId() { return id; }
+
     public String getNombre() { return nombre; }
+
     public Usuario getUsuario() { return usuario; }
+
     public List<Personaje> getPoblacion() { return poblacion; }
+
     public List<Edificio> getEdificios() { return edificios; }
+
     public Recursos getRecursos() { return recursos; }
+
     public Defensas getDefensas() { return defensas; }
+
     public List<ConstruccionEnCurso> getColaConstruccion() { return colaConstruccion; }
 
     // ================= RELACIONES =================
@@ -88,7 +98,9 @@ public class Colonia {
     }
 
     public void addConstruccion(ConstruccionEnCurso construccion) {
+
         colaConstruccion.add(construccion);
+
         construccion.setColonia(this);
     }
 
@@ -97,10 +109,13 @@ public class Colonia {
     public double calcularFactorEnergia() {
 
         int produccion = 0;
+
         int consumo = 0;
 
         for (Edificio e : edificios) {
+
             produccion += e.getProduccionEnergia();
+
             consumo += e.getConsumoEnergia();
         }
 
@@ -111,7 +126,7 @@ public class Colonia {
         return (double) produccion / consumo;
     }
 
-    // ================= CONSTRUCCIONES =================
+    // ================= CONSTRUCCIÓN =================
 
     public void procesarConstrucciones() {
 
@@ -119,14 +134,59 @@ public class Colonia {
 
         for (ConstruccionEnCurso c : colaConstruccion) {
 
-            if (c.finalizada()) {
+            int progreso = 0;
 
-                c.completar();
+            for (Personaje p : poblacion) {
+
+                if (p instanceof Trabajador t) {
+
+                    if (t.getIngenieria() > 0 && t.getCansancio() < 100) {
+
+                        progreso += t.getIngenieria();
+
+                        t.aumentarCansancio(2);
+                    }
+                }
+            }
+
+            if (progreso > 0) {
+
+                c.avanzarConstruccion(progreso);
+            }
+
+            if (c.completada()) {
+
+                TipoEdificio tipo = TipoEdificio.valueOf(c.getTipo());
+
+                Edificio edificio = new Edificio(tipo);
+
+                addEdificio(edificio);
 
                 terminadas.add(c);
             }
         }
 
         colaConstruccion.removeAll(terminadas);
+    }
+
+    // ================= PRODUCCIÓN =================
+
+    public void producirRecursos() {
+
+        double factorEnergia = calcularFactorEnergia();
+
+        for (Edificio e : edificios) {
+
+            for (Trabajador t : e.getTrabajadores()) {
+
+                if (t.getCansancio() >= 100) continue;
+
+                int produccion = e.producir(factorEnergia);
+
+                recursos.add(e.getRecursoProduce(), produccion);
+
+                t.aumentarCansancio(1);
+            }
+        }
     }
 }

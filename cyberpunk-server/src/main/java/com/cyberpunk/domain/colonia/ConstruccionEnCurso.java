@@ -1,9 +1,6 @@
 package com.cyberpunk.domain.colonia;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
-
-import com.cyberpunk.domain.edificio.Edificio;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
@@ -16,79 +13,57 @@ public class ConstruccionEnCurso {
 
     private String tipo;
 
-    private LocalDateTime tiempoInicio;
+    private int progreso;
 
-    private int duracionSegundos;
+    private int progresoNecesario;
 
     @ManyToOne
-    @JoinColumn(name = "colonia_id", nullable = false)
+    @JoinColumn(name = "colonia_id")
     @JsonBackReference
     private Colonia colonia;
 
-    @ManyToOne
-    @JoinColumn(name = "edificio_id", nullable = false)
-    private Edificio edificio;
-
-    private LocalDateTime fechaFin;
-
-    // Constructor obligatorio JPA
     public ConstruccionEnCurso() {}
 
     public ConstruccionEnCurso(String tipo) {
+
         this.tipo = tipo;
-        this.tiempoInicio = LocalDateTime.now();
-        this.duracionSegundos = 60;
-        this.fechaFin = tiempoInicio.plusSeconds(duracionSegundos);
-    }
 
-    public ConstruccionEnCurso(
-            Colonia colonia,
-            Edificio edificio,
-            int segundosBase,
-            int techiesAsignados) {
+        this.progreso = 0;
 
-        this.colonia = colonia;
-        this.edificio = edificio;
-
-        double reduccion = 1 - (techiesAsignados * 0.05);
-        if (reduccion < 0.5) reduccion = 0.5;
-
-        int segundosFinal = (int) (segundosBase * reduccion);
-
-        this.tiempoInicio = LocalDateTime.now();
-        this.duracionSegundos = segundosFinal;
-        this.fechaFin = tiempoInicio.plusSeconds(segundosFinal);
+        this.progresoNecesario = 100;
     }
 
     // ================= LÓGICA =================
 
-    public boolean finalizada() {
-        return LocalDateTime.now().isAfter(fechaFin);
+    public void avanzarConstruccion(int puntos) {
+
+        progreso += puntos;
+
+        if (progreso > progresoNecesario) {
+            progreso = progresoNecesario;
+        }
     }
 
-    public void completar() {
-        edificio.subirNivel();
+    public boolean completada() {
+
+        return progreso >= progresoNecesario;
     }
 
     // ================= GETTERS =================
 
     public Long getId() { return id; }
 
+    public String getTipo() { return tipo; }
+
+    public int getProgreso() { return progreso; }
+
+    public int getProgresoNecesario() { return progresoNecesario; }
+
     public Colonia getColonia() { return colonia; }
-
-    public Edificio getEdificio() { return edificio; }
-
-    public LocalDateTime getFechaFin() { return fechaFin; }
-
-    public LocalDateTime getTiempoInicio() { return tiempoInicio; }
 
     // ================= SETTERS =================
 
     public void setColonia(Colonia colonia) {
         this.colonia = colonia;
-    }
-
-    public void setEdificio(Edificio edificio) {
-        this.edificio = edificio;
     }
 }

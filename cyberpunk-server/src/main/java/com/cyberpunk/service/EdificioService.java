@@ -1,29 +1,24 @@
-package com.cyberpunk.service; 
+package com.cyberpunk.service;
 
-import java.util.Map; 
-import org.springframework.stereotype.Service; 
-import com.cyberpunk.domain.colonia.Colonia; 
+import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
+import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.edificio.CosteEdificioCalculator;
-import com.cyberpunk.domain.edificio.Edificio; 
-import com.cyberpunk.domain.edificio.Edificio.TipoEdificio; 
-import com.cyberpunk.domain.recursos.Recursos; 
-import com.cyberpunk.domain.recursos.Recursos.ResourceType; 
-import com.cyberpunk.repository.ColoniaRepository; 
-import com.cyberpunk.repository.EdificioRepository;
+import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
+import com.cyberpunk.domain.recursos.Recursos;
+import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.cyberpunk.repository.ColoniaRepository;
 
 @Service
 public class EdificioService {
 
     private final ColoniaRepository coloniaRepository;
-    private final EdificioRepository edificioRepository;
 
-    public EdificioService(
-            ColoniaRepository coloniaRepository,
-            EdificioRepository edificioRepository) {
-
+    public EdificioService(ColoniaRepository coloniaRepository) {
         this.coloniaRepository = coloniaRepository;
-        this.edificioRepository = edificioRepository;
     }
 
     public void construirEdificio(Long coloniaId, String tipoEdificio) {
@@ -39,12 +34,10 @@ public class EdificioService {
             throw new RuntimeException("Tipo de edificio inválido");
         }
 
-        Edificio edificio = new Edificio(tipo);
-
         Recursos recursos = colonia.getRecursos();
 
         Map<ResourceType, Integer> coste =
-                CosteEdificioCalculator.calcularCoste(tipo, edificio.getNivel());
+                CosteEdificioCalculator.calcularCoste(tipo, 0);
 
         if (!recursos.tieneSuficiente(coste)) {
             throw new RuntimeException("Recursos insuficientes");
@@ -52,13 +45,7 @@ public class EdificioService {
 
         recursos.consumir(coste);
 
-        edificio.setColonia(colonia);
-
-        edificioRepository.save(edificio);
-
         ConstruccionEnCurso construccion = new ConstruccionEnCurso(tipoEdificio);
-
-        construccion.setEdificio(edificio);
 
         colonia.addConstruccion(construccion);
 
