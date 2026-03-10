@@ -1,14 +1,15 @@
 package com.cyberpunk.domain.personaje;
 
 import com.cyberpunk.domain.colonia.Colonia;
-import com.cyberpunk.domain.tarea.Tarea;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.cyberpunk.domain.edificio.Edificio;
+import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 
 import jakarta.persistence.*;
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
-@Table(name = "personajes")
+@DiscriminatorColumn(name = "tipo_personaje")
 public abstract class Personaje {
 
     @Id
@@ -22,15 +23,18 @@ public abstract class Personaje {
     private int hambre = 100;
 
     private int cansancio = 0;
+    @ManyToOne
+    @JoinColumn(name = "edificio_id")
+    private Edificio edificioAsignado;
 
+    @ManyToOne
+    @JoinColumn(name = "construccion_id")
+    private ConstruccionEnCurso construccionAsignada;
+    
     @ManyToOne
     @JoinColumn(name = "colonia_id")
     @JsonBackReference
     private Colonia colonia;
-
-    @ManyToOne
-    @JoinColumn(name = "tarea_id")
-    private Tarea tareaActual;
 
     public Personaje() {}
 
@@ -80,7 +84,13 @@ public abstract class Personaje {
     }
 
     // ================= GETTERS =================
+    public Edificio getEdificioAsignado() {
+        return edificioAsignado;
+    }
 
+    public ConstruccionEnCurso getConstruccionAsignada() {
+        return construccionAsignada;
+    }
     public Long getId() {
         return id;
     }
@@ -105,18 +115,10 @@ public abstract class Personaje {
         return colonia;
     }
 
-    public Tarea getTareaActual() {
-        return tareaActual;
-    }
-
     // ================= SETTERS =================
 
     public void setColonia(Colonia colonia) {
         this.colonia = colonia;
-    }
-
-    public void setTareaActual(Tarea tareaActual) {
-        this.tareaActual = tareaActual;
     }
 
     // ================= PRODUCCIÓN =================

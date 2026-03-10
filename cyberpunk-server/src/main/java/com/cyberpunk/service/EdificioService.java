@@ -45,7 +45,7 @@ public class EdificioService {
 
         recursos.consumir(coste);
 
-        ConstruccionEnCurso construccion = new ConstruccionEnCurso(tipoEdificio);
+        ConstruccionEnCurso construccion = new ConstruccionEnCurso(tipo.name());
 
         colonia.addConstruccion(construccion);
 

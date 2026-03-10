@@ -1,9 +1,12 @@
 package com.cyberpunk.domain.personaje;
 
+import com.cyberpunk.domain.edificio.Edificio;
+
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "trabajadores")
+@DiscriminatorValue("TRABAJADOR")
 public class Trabajador extends Personaje {
 
     private int mineria;
@@ -11,7 +14,6 @@ public class Trabajador extends Personaje {
     private int ciencia;
     private int ingenieria;
 
-    // Constructor JPA
     public Trabajador() {}
 
     public Trabajador(
@@ -29,12 +31,10 @@ public class Trabajador extends Personaje {
         this.ingenieria = ingenieria;
     }
 
-    // ================= PRODUCCIÓN =================
+    // ================= PRODUCCIÓN GENERAL =================
 
     @Override
     public int getProduccion() {
-
-        // producción base basada en habilidades
 
         int mejorHabilidad = Math.max(
                 Math.max(mineria, agricultura),
@@ -44,22 +44,50 @@ public class Trabajador extends Personaje {
         return mejorHabilidad;
     }
 
+    // ================= PRODUCCIÓN POR EDIFICIO =================
+
+    public int getProduccionParaEdificio(Edificio edificio) {
+
+        if (edificio == null) return 0;
+
+        switch (edificio.getTipo()) {
+
+            case MINA_NEOCROMO,
+                 MINA_UMBRIUM,
+                 MINA_SYNTHERIUM,
+                 MINA_HEXALIUM,
+                 MINA_VOIDIUM -> {
+                return mineria;
+            }
+
+            case GRANJA_KROMAFRUTA,
+                 GRANJA_NEUROTRIGO,
+                 GRANJA_ALGACARNE,
+                 CRIADERO_RATAX,
+                 CULTIVO_FLORSOMNIO -> {
+                return agricultura;
+            }
+
+            case LAB_REFLEXA,
+                 LAB_NANOCURA,
+                 LAB_SOMNEX -> {
+                return ciencia;
+            }
+
+            default -> {
+                return ingenieria;
+            }
+        }
+    }
+
     // ================= GETTERS =================
 
-    public int getMineria() {
-        return mineria;
-    }
+    public int getMineria() { return mineria; }
 
-    public int getAgricultura() {
-        return agricultura;
-    }
+    public int getAgricultura() { return agricultura; }
 
-    public int getCiencia() {
-        return ciencia;
-    }
+    public int getCiencia() { return ciencia; }
 
-    public int getIngenieria() {
-        return ingenieria;
-    }
+    public int getIngenieria() { return ingenieria; }
 
 }

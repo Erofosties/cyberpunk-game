@@ -1,19 +1,16 @@
 package com.cyberpunk.service;
 
-import java.util.List;
-
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import com.cyberpunk.domain.colonia.Colonia;
+import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.edificio.Edificio;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
-import com.cyberpunk.domain.recursos.Recursos;
-import com.cyberpunk.domain.tarea.Tarea;
 import com.cyberpunk.repository.ColoniaRepository;
 
-@Service
+@Component
 public class GameEngine {
 
     private final ColoniaRepository coloniaRepository;
@@ -22,18 +19,16 @@ public class GameEngine {
         this.coloniaRepository = coloniaRepository;
     }
 
-    // ================= TICK DEL JUEGO =================
-
     @Scheduled(fixedRate = 10000)
-    public void actualizarJuego() {
+    public void tick() {
 
-        List<Colonia> colonias = coloniaRepository.findAll();
+        var colonias = coloniaRepository.findAll();
 
         for (Colonia colonia : colonias) {
 
-            procesarTareas(colonia);
+            procesarConstrucciones(colonia);
 
-            procesarDescanso(colonia);
+            procesarProduccion(colonia);
         }
 
         coloniaRepository.saveAll(colonias);
@@ -41,124 +36,64 @@ public class GameEngine {
         System.out.println("Tick del juego ejecutado");
     }
 
-    // ================= PROCESAR TAREAS =================
+    private void procesarConstrucciones(Colonia colonia) {
 
-    private void procesarTareas(Colonia colonia) {
+    	for (ConstruccionEnCurso construccion : new java.util.ArrayList<>(colonia.getColaConstruccion())) {
 
-        for (Personaje personaje : colonia.getPoblacion()) {
+            int progreso = 0;
 
-            Tarea tarea = personaje.getTareaActual();
+            for (Personaje personaje : colonia.getPoblacion()) {
 
-            if (tarea == null) {
-                continue;
+                if (personaje instanceof Trabajador trabajador) {
+
+                    progreso += trabajador.getIngenieria();
+                    trabajador.aumentarCansancio(1);
+                }
             }
 
-            if (personaje.getCansancio() >= 100) {
-                continue;
-            }
+            construccion.avanzarConstruccion(progreso);
 
-            switch (tarea.getTipo()) {
+            System.out.println("Progreso construccion: " + construccion.getProgreso());
 
-                case CONSTRUCCION -> procesarConstruccion(colonia, personaje, tarea);
+            if (construccion.completada()) {
 
-                case PRODUCCION -> procesarProduccion(colonia, personaje, tarea);
+                Edificio edificio = new Edificio(
+                        Edificio.TipoEdificio.valueOf(construccion.getTipo())
+                );
 
-                case EXPLORACION -> procesarExploracion(personaje, tarea);
-
-                case DEFENSA -> procesarDefensa(personaje);
-
-                case DESCANSO -> personaje.reducirCansancio(5);
-            }
-        }
-    }
-
-    // ================= CONSTRUCCIÓN =================
-
-    private void procesarConstruccion(Colonia colonia, Personaje personaje, Tarea tarea) {
-
-        if (!(personaje instanceof Trabajador trabajador)) {
-            return;
-        }
-
-        int progreso = trabajador.getIngenieria();
-
-        tarea.avanzar(progreso);
-
-        trabajador.aumentarCansancio(2);
-
-        if (tarea.completada()) {
-
-            Edificio edificio = tarea.getEdificio();
-
-            if (!colonia.getEdificios().contains(edificio)) {
                 colonia.addEdificio(edificio);
-            }
 
-            personaje.setTareaActual(null);
+                colonia.getColaConstruccion().remove(construccion);
+
+                break;
+            }
         }
     }
 
-    // ================= PRODUCCIÓN =================
-
-    private void procesarProduccion(Colonia colonia, Personaje personaje, Tarea tarea) {
-
-        if (!(personaje instanceof Trabajador trabajador)) {
-            return;
-        }
-
-        Edificio edificio = tarea.getEdificio();
-
-        if (edificio == null) {
-            return;
-        }
+    private void procesarProduccion(Colonia colonia) {
 
         double factorEnergia = colonia.calcularFactorEnergia();
 
-        int produccionTrabajador = trabajador.getProduccion();
+        for (Edificio edificio : colonia.getEdificios()) {
 
-        int produccion = edificio.producir(produccionTrabajador, factorEnergia);
+            for (Personaje personaje : colonia.getPoblacion()) {
 
-        Recursos recursos = colonia.getRecursos();
+                if (personaje instanceof Trabajador trabajador) {
 
-        if (edificio.getRecursoProduce() != null) {
-            recursos.add(edificio.getRecursoProduce(), produccion);
-        }
+                    int habilidad = trabajador.getProduccionParaEdificio(edificio);
 
-        trabajador.aumentarCansancio(1);
-    }
+                    int produccion = edificio.producir(habilidad, factorEnergia);
 
-    // ================= EXPLORACIÓN =================
+                    if (edificio.getRecursoProduce() != null) {
 
-    private void procesarExploracion(Personaje personaje, Tarea tarea) {
+                        colonia.getRecursos().add(
+                                edificio.getRecursoProduce(),
+                                produccion
+                        );
+                    }
 
-        int progreso = 5;
-
-        tarea.avanzar(progreso);
-
-        personaje.aumentarCansancio(1);
-
-        if (tarea.completada()) {
-
-            personaje.setTareaActual(null);
-        }
-    }
-
-    // ================= DEFENSA =================
-
-    private void procesarDefensa(Personaje personaje) {
-
-        personaje.aumentarCansancio(1);
-    }
-
-    // ================= DESCANSO =================
-
-    private void procesarDescanso(Colonia colonia) {
-
-        for (Personaje personaje : colonia.getPoblacion()) {
-
-            if (personaje.getTareaActual() == null) {
-
-                personaje.reducirCansancio(2);
+                    trabajador.aumentarCansancio(1);
+                }
             }
         }
     }

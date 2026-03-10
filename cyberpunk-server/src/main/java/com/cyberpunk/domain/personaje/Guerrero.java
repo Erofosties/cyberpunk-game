@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "guerreros")
+@DiscriminatorValue("GUERRERO")
 public class Guerrero extends Personaje {
 
     private int fuerza;
@@ -11,7 +12,6 @@ public class Guerrero extends Personaje {
     private int resistencia;
     private int hackeo;
 
-    // Constructor JPA
     public Guerrero() {}
 
     public Guerrero(
@@ -30,8 +30,6 @@ public class Guerrero extends Personaje {
     }
 
     // ================= PRODUCCIÓN =================
-
-    // Los guerreros no producen recursos
 
     @Override
     public int getProduccion() {
