@@ -174,4 +174,10 @@ public class Recursos {
         EXPLORACION,
         ENERGIA
     }
+    public void setEnergia(int energia) {
+        this.energia = energia;
+    }
+    public int getEnergia() {
+    	return energia;
+    }
 }

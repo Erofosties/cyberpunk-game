@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.cyberpunk.gameBalance.GameBalance;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
@@ -39,7 +40,7 @@ public class Edificio {
     public Edificio(TipoEdificio tipo) {
 
         this.tipo = tipo;
-        this.nivel = nivelInicialPorTipo(tipo);
+        this.nivel = 1;
         this.vidaEstructural = 100;
         this.recursoProduce = mapTipoToRecurso(tipo);
 
@@ -68,24 +69,11 @@ public class Edificio {
 
         PLACA_SOLAR,
         REACTOR_FUSION,
-        GENERADOR_NEON
+        GENERADOR_NEON,
+
+        BATERIA_ENERGIA
     }
 
-    // ================= NIVEL INICIAL =================
-
-    private static int nivelInicialPorTipo(TipoEdificio tipo) {
-
-        return switch (tipo) {
-
-            case MINA_NEOCROMO,
-                 MINA_UMBRIUM,
-                 MINA_SYNTHERIUM,
-                 MINA_HEXALIUM,
-                 MINA_VOIDIUM -> 0;
-
-            default -> 1;
-        };
-    }
 
     // ================= CONFIGURACIÓN ENERGÍA =================
 
@@ -128,22 +116,28 @@ public class Edificio {
             case PLACA_SOLAR,
                  REACTOR_FUSION,
                  GENERADOR_NEON -> ResourceType.ENERGIA;
+            default ->null;
         };
     }
 
     // ================= PRODUCCIÓN =================
 
-    public int producir(int produccionTrabajadores, double factorEnergia) {
+    public int producir(int habilidadTrabajador, double factorEnergia) {
 
-        if (nivel == 0) return 0;
+        if (recursoProduce == null) return 0;
 
-        if (esEnergetico()) return 0;
+        int base = GameBalance.getProduccionBase(tipo);
 
-        double bonusNivel = nivel * Math.pow(1.1, nivel);
+        double bonusTrabajador = 1 + (habilidadTrabajador * 0.15);
 
-        return (int) Math.round(produccionTrabajadores * bonusNivel * factorEnergia);
+        double produccion = base
+                * nivel
+                * Math.pow(1.05, nivel)
+                * bonusTrabajador
+                * factorEnergia;
+
+        return (int)produccion;
     }
-
     // ================= ENERGÍA =================
 
     public boolean esEnergetico() {
@@ -157,19 +151,29 @@ public class Edificio {
 
         if (!esEnergetico()) return 0;
 
+        int base = GameBalance.getProduccionBase(tipo);
+
         double bonus = 1 + (trabajadoresAsignados * 0.15);
 
         return (int)(
-                produccionEnergiaBase
-                        * nivel
-                        * Math.pow(1.05, nivel)
-                        * bonus
+                base
+                * nivel
+                * Math.pow(1.05, nivel)
+                * bonus
         );
     }
 
     public int getConsumoEnergia() {
 
-        return (int)(consumoEnergiaBase * nivel * Math.pow(1.08, nivel));
+        int base = GameBalance.getEnergiaBase(tipo);
+
+        if (base >= 0) return 0;
+
+        return (int)(
+                Math.abs(base)
+                * nivel
+                * Math.pow(1.08, nivel)
+        );
     }
 
     // ================= NIVEL =================

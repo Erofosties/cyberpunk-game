@@ -96,7 +96,20 @@ public class Colonia {
     }
 
     // ================= ENERGÍA =================
+    public int calcularCapacidadEnergia() {
 
+        int capacidad = 0;
+
+        for (Edificio edificio : edificios) {
+
+            if (edificio.getTipo() == Edificio.TipoEdificio.BATERIA_ENERGIA) {
+                capacidad += 100 * edificio.getNivel();
+            }
+        }
+
+        return capacidad;
+    }
+    
     public double calcularFactorEnergia() {
 
         int produccion = 0;

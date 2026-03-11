@@ -1,9 +1,10 @@
 package com.cyberpunk.domain.edificio;
 
-import java.util.EnumMap;
 import java.util.Map;
+import java.util.EnumMap;
 
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.cyberpunk.gameBalance.GameBalance;
 
 public class CosteEdificioCalculator {
 
@@ -14,42 +15,28 @@ public class CosteEdificioCalculator {
             Edificio.TipoEdificio tipo,
             int nivelActual) {
 
-        Map<ResourceType, Integer> coste = new EnumMap<>(ResourceType.class);
+        Map<ResourceType, Integer> base = GameBalance.getCosteBase(tipo);
 
-        int base = switch (tipo) {
+        Map<ResourceType, Integer> costeFinal = new EnumMap<>(ResourceType.class);
 
-            case MINA_NEOCROMO -> 100;
-            case MINA_UMBRIUM -> 120;
-            case MINA_SYNTHERIUM -> 140;
-            case MINA_HEXALIUM -> 160;
-            case MINA_VOIDIUM -> 200;
+        double multiplicador = Math.pow(FACTOR_COSTE, nivelActual);
 
-            case GRANJA_KROMAFRUTA -> 80;
-            case GRANJA_NEUROTRIGO -> 80;
-            case GRANJA_ALGACARNE -> 90;
-            case CRIADERO_RATAX -> 100;
-            case CULTIVO_FLORSOMNIO -> 110;
+        for (var entry : base.entrySet()) {
 
-            case LAB_REFLEXA -> 150;
-            case LAB_NANOCURA -> 150;
-            case LAB_SOMNEX -> 170;
+            int valor = (int)(entry.getValue() * multiplicador);
 
-            case PLACA_SOLAR -> 150;
-            case REACTOR_FUSION -> 200;
-            case GENERADOR_NEON -> 180;
-        };
+            costeFinal.put(entry.getKey(), valor);
+        }
 
-        int costeFinal = (int)(base * Math.pow(FACTOR_COSTE, nivelActual));
-
-        coste.put(ResourceType.NEOCROMO, costeFinal);
-
-        return coste;
+        return costeFinal;
     }
 
-    public static int calcularTiempoConstruccion(int nivelActual) {
+    public static int calcularTiempoConstruccion(
+            Edificio.TipoEdificio tipo,
+            int nivelActual) {
 
-        int baseTiempo = 60;
+        int base = GameBalance.getTiempoBase(tipo);
 
-        return (int)(baseTiempo * Math.pow(FACTOR_TIEMPO, nivelActual));
+        return (int)(base * Math.pow(FACTOR_TIEMPO, nivelActual));
     }
 }
