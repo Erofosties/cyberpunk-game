@@ -34,14 +34,16 @@ public class Recursos {
     private int somnex;
 
     // OTROS
-    private int energia;
     private int exploracion;
+
+    // ENERGÍA (nuevo sistema)
+    private int energiaDisponible;
+    private int energiaAcumulada;
 
     public Recursos() {
 
         this.ultimoCalculo = System.currentTimeMillis();
 
-        // recursos iniciales
         this.neocromo = 1000;
         this.umbrium = 300;
         this.kromafruta = 1000;
@@ -77,7 +79,6 @@ public class Recursos {
             case NANOCURA -> nanocura += amount;
             case SOMNEX -> somnex += amount;
 
-            case ENERGIA -> energia += amount;
             case EXPLORACION -> exploracion += amount;
         }
     }
@@ -113,7 +114,6 @@ public class Recursos {
             case NANOCURA -> nanocura;
             case SOMNEX -> somnex;
 
-            case ENERGIA -> energia;
             case EXPLORACION -> exploracion;
         };
     }
@@ -159,9 +159,26 @@ public class Recursos {
             case NANOCURA -> nanocura = Math.max(0, nanocura - amount);
             case SOMNEX -> somnex = Math.max(0, somnex - amount);
 
-            case ENERGIA -> energia = Math.max(0, energia - amount);
             case EXPLORACION -> exploracion = Math.max(0, exploracion - amount);
         }
+    }
+
+    // ================= ENERGÍA =================
+
+    public int getEnergiaDisponible() {
+        return energiaDisponible;
+    }
+
+    public void setEnergiaDisponible(int energiaDisponible) {
+        this.energiaDisponible = energiaDisponible;
+    }
+
+    public int getEnergiaAcumulada() {
+        return energiaAcumulada;
+    }
+
+    public void setEnergiaAcumulada(int energiaAcumulada) {
+        this.energiaAcumulada = energiaAcumulada;
     }
 
     // ================= ENUM =================
@@ -171,13 +188,6 @@ public class Recursos {
         NEOCROMO, UMBRIUM, SYNTHERIUM, HEXALIUM, VOIDIUM,
         KROMAFRUTA, ALGACARNE, NEUROTRIGO, RATAX, FLORSOMNIO,
         REFLEXA, NANOCURA, SOMNEX,
-        EXPLORACION,
-        ENERGIA
-    }
-    public void setEnergia(int energia) {
-        this.energia = energia;
-    }
-    public int getEnergia() {
-    	return energia;
+        EXPLORACION
     }
 }

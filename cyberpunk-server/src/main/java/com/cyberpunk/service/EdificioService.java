@@ -78,6 +78,10 @@ public class EdificioService {
         ConstruccionEnCurso construccion = construccionRepository.findById(construccionId)
                 .orElseThrow(() -> new RuntimeException("Construccion no encontrada"));
 
+        // liberar trabajo anterior
+        personaje.setEdificioAsignado(null);
+        personaje.setConstruccionAsignada(null);
+
         personaje.setConstruccionAsignada(construccion);
 
         personajeRepository.save(personaje);
@@ -92,6 +96,14 @@ public class EdificioService {
 
         Edificio edificio = edificioRepository.findById(edificioId)
                 .orElseThrow(() -> new RuntimeException("Edificio no encontrado"));
+
+        // ❌ BLOQUEAR EDIFICIOS QUE NO ACEPTAN TRABAJADORES
+        if (edificio.getTipo() == TipoEdificio.PLACA_SOLAR
+                || edificio.getTipo() == TipoEdificio.GENERADOR_NEON
+                || edificio.getTipo() == TipoEdificio.BATERIA_ENERGIA) {
+
+            throw new RuntimeException("No se pueden asignar trabajadores a este edificio");
+        }
 
         personaje.setEdificioAsignado(edificio);
 

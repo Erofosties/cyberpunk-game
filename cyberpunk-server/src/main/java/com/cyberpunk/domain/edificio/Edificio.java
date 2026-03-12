@@ -115,7 +115,7 @@ public class Edificio {
 
             case PLACA_SOLAR,
                  REACTOR_FUSION,
-                 GENERADOR_NEON -> ResourceType.ENERGIA;
+                 GENERADOR_NEON -> null;
             default ->null;
         };
     }

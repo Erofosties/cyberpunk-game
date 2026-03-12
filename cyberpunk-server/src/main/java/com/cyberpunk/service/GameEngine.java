@@ -12,7 +12,6 @@ import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.edificio.Edificio;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
-import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.EdificioRepository;
 
@@ -36,175 +35,255 @@ public class GameEngine {
     @Transactional
     public void tick() {
 
-        var colonias = coloniaRepository.findAll();
+        List<Colonia> colonias = coloniaRepository.findAll();
 
         for (Colonia colonia : colonias) {
 
             procesarEnergia(colonia);
-
             procesarConstrucciones(colonia);
-
             procesarProduccion(colonia);
         }
 
         coloniaRepository.saveAll(colonias);
 
-        System.out.println("Tick del juego ejecutado");
+        System.out.println("Tick ejecutado: colonias procesadas = " + colonias.size());
     }
 
     // ================= ENERGÍA =================
 
     private void procesarEnergia(Colonia colonia) {
 
-        int energiaProducida = 0;
+        int produccion = calcularProduccionEnergia(colonia);
+        int consumo = calcularConsumoEnergia(colonia);
+
+        var recursos = colonia.getRecursos();
+
+        int energiaAcumulada = recursos.getEnergiaAcumulada();
+        int capacidadBaterias = colonia.calcularCapacidadEnergia();
+
+        int energiaDisponible = produccion - consumo;
+
+        if (energiaDisponible >= 0) {
+
+            energiaAcumulada += energiaDisponible;
+
+            if (energiaAcumulada > capacidadBaterias)
+                energiaAcumulada = capacidadBaterias;
+
+        } else {
+
+            int deficit = Math.abs(energiaDisponible);
+
+            if (energiaAcumulada >= deficit) {
+
+                energiaAcumulada -= deficit;
+
+            } else {
+
+                energiaAcumulada = 0;
+            }
+        }
+
+        recursos.setEnergiaDisponible(Math.max(0, produccion - consumo));
+        recursos.setEnergiaAcumulada(energiaAcumulada);
+    }
+
+    private int calcularProduccionEnergia(Colonia colonia) {
+
+        int produccion = 0;
 
         for (Edificio edificio : colonia.getEdificios()) {
 
             switch (edificio.getTipo()) {
 
-                // PRODUCEN SOLOS
-                case PLACA_SOLAR, GENERADOR_NEON -> {
+                case PLACA_SOLAR, GENERADOR_NEON ->
+                        produccion += edificio.getProduccionEnergia(0);
 
-                    energiaProducida += edificio.getProduccionEnergia(0);
-                }
-
-                // REQUIERE TRABAJADORES
-                case REACTOR_FUSION -> {
-
-                    int trabajadoresIngenieria = 0;
-
-                    for (Personaje personaje : colonia.getPoblacion()) {
-
-                        if (personaje instanceof Trabajador trabajador
-                                && trabajador.getEdificioAsignado() != null
-                                && trabajador.getEdificioAsignado().getId().equals(edificio.getId())
-                                && trabajador.getCansancio() < 100) {
-
-                            trabajadoresIngenieria += trabajador.getIngenieria();
-                        }
-                    }
-
-                    energiaProducida += edificio.getProduccionEnergia(trabajadoresIngenieria);
-                }
+                case REACTOR_FUSION ->
+                        produccion += edificio.getProduccionEnergia(
+                                calcularIngenieriaAsignada(colonia, edificio)
+                        );
 
                 default -> {}
             }
         }
 
-        int energiaActual = colonia.getRecursos().getCantidad(ResourceType.ENERGIA);
+        return produccion;
+    }
 
-        int capacidad = colonia.calcularCapacidadEnergia();
+    private int calcularConsumoEnergia(Colonia colonia) {
 
-        int nuevaEnergia = energiaActual + energiaProducida;
+        int consumo = 0;
 
-        if (nuevaEnergia > capacidad) {
-            nuevaEnergia = capacidad;
+        for (Edificio edificio : colonia.getEdificios()) {
+
+            if (edificioTieneTrabajadores(colonia, edificio)) {
+
+                consumo += edificio.getConsumoEnergia();
+            }
         }
 
-        colonia.getRecursos().setEnergia(nuevaEnergia);
+        return consumo;
     }
 
     // ================= CONSTRUCCIONES =================
 
     private void procesarConstrucciones(Colonia colonia) {
 
-        List<ConstruccionEnCurso> terminadas = new ArrayList<>();
+        List<ConstruccionEnCurso> completadas = new ArrayList<>();
 
-        for (ConstruccionEnCurso construccion : new ArrayList<>(colonia.getColaConstruccion())) {
+        for (ConstruccionEnCurso construccion : colonia.getColaConstruccion()) {
 
-            int progreso = 0;
+            int progreso = calcularProgresoConstruccion(colonia, construccion);
 
-            for (Personaje personaje : colonia.getPoblacion()) {
-
-                if (personaje instanceof Trabajador trabajador
-                        && trabajador.getConstruccionAsignada() != null
-                        && trabajador.getConstruccionAsignada().getId().equals(construccion.getId())
-                        && trabajador.getCansancio() < 100) {
-
-                    progreso += trabajador.getIngenieria();
-
-                    trabajador.aumentarCansancio(2);
-
-                    if (trabajador.getCansancio() >= 100) {
-                        trabajador.setConstruccionAsignada(null);
-                    }
-                }
+            if (progreso > 0) {
+                construccion.avanzarConstruccion(progreso);
             }
-
-            construccion.avanzarConstruccion(progreso);
-
-            System.out.println("Progreso construccion: " + construccion.getProgreso());
 
             if (construccion.completada()) {
 
-                Edificio edificio = new Edificio(
-                        Edificio.TipoEdificio.valueOf(construccion.getTipo())
-                );
+               crearEdificio(construccion, colonia);
 
-                edificio.setColonia(colonia);
+                liberarTrabajadoresConstruccion(colonia, construccion);
 
-                edificioRepository.save(edificio);
-
-                colonia.getEdificios().add(edificio);
-
-                // liberar trabajadores
-                for (Personaje personaje : colonia.getPoblacion()) {
-
-                    if (personaje.getConstruccionAsignada() != null
-                            && personaje.getConstruccionAsignada().getId().equals(construccion.getId())) {
-
-                        personaje.setConstruccionAsignada(null);
-                    }
-                }
-
-                terminadas.add(construccion);
+                completadas.add(construccion);
             }
         }
 
-        colonia.getColaConstruccion().removeAll(terminadas);
+        colonia.getColaConstruccion().removeAll(completadas);
+    }
+
+    private int calcularProgresoConstruccion(Colonia colonia, ConstruccionEnCurso construccion) {
+
+        int progreso = 0;
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            if (personaje instanceof Trabajador trabajador
+                    && trabajador.getConstruccionAsignada() != null
+                    && trabajador.getConstruccionAsignada().getId().equals(construccion.getId())
+                    && trabajador.getCansancio() < 100) {
+
+                progreso += trabajador.getIngenieria();
+
+                trabajador.aumentarCansancio(2);
+            }
+        }
+
+        return progreso;
+    }
+
+    private Edificio crearEdificio(ConstruccionEnCurso construccion, Colonia colonia) {
+
+        Edificio edificio = new Edificio(
+                Edificio.TipoEdificio.valueOf(construccion.getTipo())
+        );
+
+        edificio.setColonia(colonia);
+
+        edificioRepository.save(edificio);
+
+        colonia.getEdificios().add(edificio);
+
+        return edificio;
     }
 
     // ================= PRODUCCIÓN =================
 
     private void procesarProduccion(Colonia colonia) {
 
+        int energiaDisponible = colonia.getRecursos().getEnergiaDisponible();
+
         for (Edificio edificio : colonia.getEdificios()) {
 
-            for (Personaje personaje : colonia.getPoblacion()) {
+            List<Trabajador> trabajadores = obtenerTrabajadoresEdificio(colonia, edificio);
 
-                if (personaje instanceof Trabajador trabajador
-                        && trabajador.getEdificioAsignado() != null
-                        && trabajador.getEdificioAsignado().getId().equals(edificio.getId())
-                        && trabajador.getCansancio() < 100) {
+            if (trabajadores.isEmpty())
+                continue;
 
-                    int consumoEnergia = edificio.getConsumoEnergia();
+            int consumoEnergia = edificio.getConsumoEnergia();
 
-                    int energiaDisponible = colonia.getRecursos().getCantidad(ResourceType.ENERGIA);
+            if (energiaDisponible < consumoEnergia)
+                continue;
 
-                    if (energiaDisponible < consumoEnergia) {
-                        continue;
-                    }
+            energiaDisponible -= consumoEnergia;
 
-                    colonia.getRecursos().consumir(ResourceType.ENERGIA, consumoEnergia);
+            producirRecursos(colonia, edificio, trabajadores);
 
-                    int habilidad = trabajador.getProduccionParaEdificio(edificio);
+            aumentarCansancio(trabajadores);
+        }
 
-                    int produccion = edificio.producir(habilidad, 1);
+        colonia.getRecursos().setEnergiaDisponible(energiaDisponible);
+    }
 
-                    if (edificio.getRecursoProduce() != null) {
+    private void producirRecursos(Colonia colonia, Edificio edificio, List<Trabajador> trabajadores) {
 
-                        colonia.getRecursos().add(
-                                edificio.getRecursoProduce(),
-                                produccion
-                        );
-                    }
+        int habilidadTotal = trabajadores
+                .stream()
+                .mapToInt(t -> t.getProduccionParaEdificio(edificio))
+                .sum();
 
-                    trabajador.aumentarCansancio(1);
+        int produccion = edificio.producir(habilidadTotal, 1);
 
-                    if (trabajador.getCansancio() >= 100) {
-                        trabajador.setEdificioAsignado(null);
-                    }
+        if (edificio.getRecursoProduce() != null) {
+
+            colonia.getRecursos().add(
+                    edificio.getRecursoProduce(),
+                    produccion
+            );
+        }
+    }
+
+    // ================= UTILIDADES =================
+
+    private List<Trabajador> obtenerTrabajadoresEdificio(Colonia colonia, Edificio edificio) {
+
+        return colonia.getPoblacion()
+                .stream()
+                .filter(p -> p instanceof Trabajador)
+                .map(p -> (Trabajador) p)
+                .filter(t -> t.getEdificioAsignado() != null)
+                .filter(t -> t.getEdificioAsignado().getId().equals(edificio.getId()))
+                .filter(t -> t.getCansancio() < 100)
+                .toList();
+    }
+
+    private int calcularIngenieriaAsignada(Colonia colonia, Edificio edificio) {
+
+        return obtenerTrabajadoresEdificio(colonia, edificio)
+                .stream()
+                .mapToInt(Trabajador::getIngenieria)
+                .sum();
+    }
+
+    private boolean edificioTieneTrabajadores(Colonia colonia, Edificio edificio) {
+
+        return !obtenerTrabajadoresEdificio(colonia, edificio).isEmpty();
+    }
+
+    private void liberarTrabajadoresConstruccion(Colonia colonia, ConstruccionEnCurso construccion) {
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            if (personaje instanceof Trabajador trabajador) {
+
+                if (trabajador.getConstruccionAsignada() != null &&
+                        trabajador.getConstruccionAsignada().getId().equals(construccion.getId())) {
+
+                    trabajador.setConstruccionAsignada(null);
                 }
+            }
+        }
+    }
+
+    private void aumentarCansancio(List<Trabajador> trabajadores) {
+
+        for (Trabajador trabajador : trabajadores) {
+
+            trabajador.aumentarCansancio(1);
+
+            if (trabajador.getCansancio() >= 100) {
+                trabajador.setEdificioAsignado(null);
             }
         }
     }
