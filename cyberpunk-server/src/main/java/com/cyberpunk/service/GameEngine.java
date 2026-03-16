@@ -10,23 +10,32 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.edificio.Edificio;
+import com.cyberpunk.domain.map.MapSector;
+import com.cyberpunk.domain.personaje.Guerrero;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.repository.ColoniaRepository;
-import com.cyberpunk.repository.EdificioRepository;
+import com.cyberpunk.repository.MapSectorRepository;
+import com.cyberpunk.repository.PersonajeRepository;
 
 @Component
 public class GameEngine {
 
     private final ColoniaRepository coloniaRepository;
-    private final EdificioRepository edificioRepository;
+    private final MapSectorRepository mapSectorRepository;
+    private final PersonajeRepository personajeRepository;
+    private final ExplorationService explorationService;
 
     public GameEngine(
             ColoniaRepository coloniaRepository,
-            EdificioRepository edificioRepository) {
+            MapSectorRepository mapSectorRepository,
+            PersonajeRepository personajeRepository,
+            ExplorationService explorationService) {
 
         this.coloniaRepository = coloniaRepository;
-        this.edificioRepository = edificioRepository;
+        this.mapSectorRepository = mapSectorRepository;
+        this.personajeRepository = personajeRepository;
+        this.explorationService = explorationService;
     }
 
     // ================= TICK =================
@@ -39,9 +48,13 @@ public class GameEngine {
 
         for (Colonia colonia : colonias) {
 
-            procesarEnergia(colonia);
             procesarConstrucciones(colonia);
             procesarProduccion(colonia);
+
+            procesarHambre(colonia);
+            procesarComida(colonia);
+            procesarDescanso(colonia);
+            procesarExploracion(colonia);
         }
 
         coloniaRepository.saveAll(colonias);
@@ -49,81 +62,19 @@ public class GameEngine {
         System.out.println("Tick ejecutado: colonias procesadas = " + colonias.size());
     }
 
-    // ================= ENERGÍA =================
+    // ================= EXPLORACIÓN =================
 
-    private void procesarEnergia(Colonia colonia) {
+    private void procesarExploracion(Colonia colonia) {
 
-        int produccion = calcularProduccionEnergia(colonia);
-        int consumo = calcularConsumoEnergia(colonia);
+        List<Personaje> personajes = personajeRepository.findByColonia(colonia);
 
-        var recursos = colonia.getRecursos();
+        for (Personaje personaje : personajes) {
 
-        int energiaAcumulada = recursos.getEnergiaAcumulada();
-        int capacidadBaterias = colonia.calcularCapacidadEnergia();
+            if (personaje instanceof Guerrero guerrero) {
 
-        int energiaDisponible = produccion - consumo;
-
-        if (energiaDisponible >= 0) {
-
-            energiaAcumulada += energiaDisponible;
-
-            if (energiaAcumulada > capacidadBaterias)
-                energiaAcumulada = capacidadBaterias;
-
-        } else {
-
-            int deficit = Math.abs(energiaDisponible);
-
-            if (energiaAcumulada >= deficit) {
-
-                energiaAcumulada -= deficit;
-
-            } else {
-
-                energiaAcumulada = 0;
+                explorationService.revelarAlrededor(guerrero);
             }
         }
-
-        recursos.setEnergiaDisponible(Math.max(0, produccion - consumo));
-        recursos.setEnergiaAcumulada(energiaAcumulada);
-    }
-
-    private int calcularProduccionEnergia(Colonia colonia) {
-
-        int produccion = 0;
-
-        for (Edificio edificio : colonia.getEdificios()) {
-
-            switch (edificio.getTipo()) {
-
-                case PLACA_SOLAR, GENERADOR_NEON ->
-                        produccion += edificio.getProduccionEnergia(0);
-
-                case REACTOR_FUSION ->
-                        produccion += edificio.getProduccionEnergia(
-                                calcularIngenieriaAsignada(colonia, edificio)
-                        );
-
-                default -> {}
-            }
-        }
-
-        return produccion;
-    }
-
-    private int calcularConsumoEnergia(Colonia colonia) {
-
-        int consumo = 0;
-
-        for (Edificio edificio : colonia.getEdificios()) {
-
-            if (edificioTieneTrabajadores(colonia, edificio)) {
-
-                consumo += edificio.getConsumoEnergia();
-            }
-        }
-
-        return consumo;
     }
 
     // ================= CONSTRUCCIONES =================
@@ -142,7 +93,7 @@ public class GameEngine {
 
             if (construccion.completada()) {
 
-               crearEdificio(construccion, colonia);
+                crearEdificio(construccion, colonia);
 
                 liberarTrabajadoresConstruccion(colonia, construccion);
 
@@ -173,93 +124,93 @@ public class GameEngine {
         return progreso;
     }
 
-    private Edificio crearEdificio(ConstruccionEnCurso construccion, Colonia colonia) {
+    private void crearEdificio(ConstruccionEnCurso construccion, Colonia colonia) {
 
-        Edificio edificio = new Edificio(
+        MapSector sector = construccion.getSectorDestino();
+
+        if (sector == null)
+            return;
+
+        sector.setBuilding(
                 Edificio.TipoEdificio.valueOf(construccion.getTipo())
         );
 
-        edificio.setColonia(colonia);
+        sector.setOwner(colonia.getUsuario());
 
-        edificioRepository.save(edificio);
-
-        colonia.getEdificios().add(edificio);
-
-        return edificio;
+        mapSectorRepository.save(sector);
     }
 
     // ================= PRODUCCIÓN =================
 
     private void procesarProduccion(Colonia colonia) {
 
-        int energiaDisponible = colonia.getRecursos().getEnergiaDisponible();
+        for (Personaje personaje : colonia.getPoblacion()) {
 
-        for (Edificio edificio : colonia.getEdificios()) {
-
-            List<Trabajador> trabajadores = obtenerTrabajadoresEdificio(colonia, edificio);
-
-            if (trabajadores.isEmpty())
+            if (!(personaje instanceof Trabajador trabajador))
                 continue;
 
-            int consumoEnergia = edificio.getConsumoEnergia();
-
-            if (energiaDisponible < consumoEnergia)
+            if (trabajador.getSectorAsignado() == null)
                 continue;
 
-            energiaDisponible -= consumoEnergia;
+            if (trabajador.getCansancio() >= 100)
+                continue;
 
-            producirRecursos(colonia, edificio, trabajadores);
+            MapSector sector = trabajador.getSectorAsignado();
 
-            aumentarCansancio(trabajadores);
+            if (sector.getBuilding() == null)
+                continue;
+
+            producirEnSector(colonia, trabajador, sector);
         }
-
-        colonia.getRecursos().setEnergiaDisponible(energiaDisponible);
     }
 
-    private void producirRecursos(Colonia colonia, Edificio edificio, List<Trabajador> trabajadores) {
+    private void producirEnSector(Colonia colonia, Trabajador trabajador, MapSector sector) {
 
-        int habilidadTotal = trabajadores
-                .stream()
-                .mapToInt(t -> t.getProduccionParaEdificio(edificio))
-                .sum();
+        var tipo = sector.getBuilding();
 
-        int produccion = edificio.producir(habilidadTotal, 1);
+        int habilidad = trabajador.getProduccionParaEdificio(tipo);
 
-        if (edificio.getRecursoProduce() != null) {
+        int base = com.cyberpunk.gameBalance.GameBalance.getProduccionBase(tipo);
 
-            colonia.getRecursos().add(
-                    edificio.getRecursoProduce(),
-                    produccion
-            );
+        double riqueza = sector.getRichness();
+
+        int produccion = (int) (base * habilidad * riqueza);
+
+        var recurso = convertirRecurso(tipo);
+
+        if (recurso != null) {
+
+            colonia.getRecursos().add(recurso, produccion);
         }
+
+        trabajador.aumentarCansancio(1);
+    }
+
+    private com.cyberpunk.domain.recursos.Recursos.ResourceType convertirRecurso(Edificio.TipoEdificio tipo) {
+
+        return switch (tipo) {
+
+            case MINA_NEOCROMO -> com.cyberpunk.domain.recursos.Recursos.ResourceType.NEOCROMO;
+            case MINA_UMBRIUM -> com.cyberpunk.domain.recursos.Recursos.ResourceType.UMBRIUM;
+            case MINA_SYNTHERIUM -> com.cyberpunk.domain.recursos.Recursos.ResourceType.SYNTHERIUM;
+            case MINA_HEXALIUM -> com.cyberpunk.domain.recursos.Recursos.ResourceType.HEXALIUM;
+            case MINA_VOIDIUM -> com.cyberpunk.domain.recursos.Recursos.ResourceType.VOIDIUM;
+
+            case GRANJA_KROMAFRUTA -> com.cyberpunk.domain.recursos.Recursos.ResourceType.KROMAFRUTA;
+            case GRANJA_NEUROTRIGO -> com.cyberpunk.domain.recursos.Recursos.ResourceType.NEUROTRIGO;
+            case GRANJA_ALGACARNE -> com.cyberpunk.domain.recursos.Recursos.ResourceType.ALGACARNE;
+            case CRIADERO_RATAX -> com.cyberpunk.domain.recursos.Recursos.ResourceType.RATAX;
+            case CULTIVO_FLORSOMNIO -> com.cyberpunk.domain.recursos.Recursos.ResourceType.FLORSOMNIO;
+
+            case LAB_REFLEXA -> com.cyberpunk.domain.recursos.Recursos.ResourceType.REFLEXA;
+            case LAB_NANOCURA -> com.cyberpunk.domain.recursos.Recursos.ResourceType.NANOCURA;
+            case LAB_SOMNEX -> com.cyberpunk.domain.recursos.Recursos.ResourceType.SOMNEX;
+
+            default -> null;
+        };
     }
 
     // ================= UTILIDADES =================
-
-    private List<Trabajador> obtenerTrabajadoresEdificio(Colonia colonia, Edificio edificio) {
-
-        return colonia.getPoblacion()
-                .stream()
-                .filter(p -> p instanceof Trabajador)
-                .map(p -> (Trabajador) p)
-                .filter(t -> t.getEdificioAsignado() != null)
-                .filter(t -> t.getEdificioAsignado().getId().equals(edificio.getId()))
-                .filter(t -> t.getCansancio() < 100)
-                .toList();
-    }
-
-    private int calcularIngenieriaAsignada(Colonia colonia, Edificio edificio) {
-
-        return obtenerTrabajadoresEdificio(colonia, edificio)
-                .stream()
-                .mapToInt(Trabajador::getIngenieria)
-                .sum();
-    }
-
-    private boolean edificioTieneTrabajadores(Colonia colonia, Edificio edificio) {
-
-        return !obtenerTrabajadoresEdificio(colonia, edificio).isEmpty();
-    }
 
     private void liberarTrabajadoresConstruccion(Colonia colonia, ConstruccionEnCurso construccion) {
 
@@ -276,14 +227,33 @@ public class GameEngine {
         }
     }
 
-    private void aumentarCansancio(List<Trabajador> trabajadores) {
+    // ================= SISTEMA BIOLÓGICO =================
 
-        for (Trabajador trabajador : trabajadores) {
+    private void procesarHambre(Colonia colonia) {
 
-            trabajador.aumentarCansancio(1);
+        for (Personaje personaje : colonia.getPoblacion()) {
 
-            if (trabajador.getCansancio() >= 100) {
-                trabajador.setEdificioAsignado(null);
+            personaje.tickHambre();
+        }
+    }
+
+    private void procesarComida(Colonia colonia) {
+
+        var recursos = colonia.getRecursos();
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            personaje.intentarComer(recursos);
+        }
+    }
+
+    private void procesarDescanso(Colonia colonia) {
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            if (personaje.estaDisponible()) {
+
+                personaje.descansar();
             }
         }
     }

@@ -1,6 +1,8 @@
 package com.cyberpunk.domain.colonia;
 
 import jakarta.persistence.*;
+
+import com.cyberpunk.domain.map.MapSector;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
@@ -22,48 +24,36 @@ public class ConstruccionEnCurso {
     @JsonBackReference
     private Colonia colonia;
 
+    @ManyToOne
+    @JoinColumn(name = "sector_id")
+    private MapSector sectorDestino;
+
     public ConstruccionEnCurso() {}
 
-    public ConstruccionEnCurso(String tipo) {
-
+    public ConstruccionEnCurso(String tipo, MapSector sector) {
         this.tipo = tipo;
-
+        this.sectorDestino = sector;
         this.progreso = 0;
-
         this.progresoNecesario = 100;
     }
-
-    // ================= LÓGICA =================
 
     public void avanzarConstruccion(int puntos) {
 
         progreso += puntos;
 
-        if (progreso > progresoNecesario) {
+        if (progreso > progresoNecesario)
             progreso = progresoNecesario;
-        }
     }
 
     public boolean completada() {
-
         return progreso >= progresoNecesario;
     }
-
-    // ================= GETTERS =================
 
     public Long getId() { return id; }
 
     public String getTipo() { return tipo; }
 
-    public int getProgreso() { return progreso; }
+    public MapSector getSectorDestino() { return sectorDestino; }
 
-    public int getProgresoNecesario() { return progresoNecesario; }
-
-    public Colonia getColonia() { return colonia; }
-
-    // ================= SETTERS =================
-
-    public void setColonia(Colonia colonia) {
-        this.colonia = colonia;
-    }
+    public void setColonia(Colonia colonia) { this.colonia = colonia; }
 }

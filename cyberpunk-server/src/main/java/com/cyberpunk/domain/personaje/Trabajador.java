@@ -1,6 +1,6 @@
 package com.cyberpunk.domain.personaje;
 
-import com.cyberpunk.domain.edificio.Edificio;
+import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 
 import jakarta.persistence.*;
 
@@ -46,11 +46,12 @@ public class Trabajador extends Personaje {
 
     // ================= PRODUCCIÓN POR EDIFICIO =================
 
-    public int getProduccionParaEdificio(Edificio edificio) {
+    public int getProduccionParaEdificio(TipoEdificio tipo) {
 
-        if (edificio == null) return 0;
+        if (tipo == null)
+            return 0;
 
-        switch (edificio.getTipo()) {
+        switch (tipo) {
 
             case MINA_NEOCROMO,
                  MINA_UMBRIUM,
@@ -89,5 +90,4 @@ public class Trabajador extends Personaje {
     public int getCiencia() { return ciencia; }
 
     public int getIngenieria() { return ingenieria; }
-
 }

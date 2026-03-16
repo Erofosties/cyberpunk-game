@@ -12,6 +12,9 @@ public class Guerrero extends Personaje {
     private int resistencia;
     private int hackeo;
 
+    // NUEVO: rango de visión en el mapa
+    private int vision = 3;
+
     public Guerrero() {}
 
     public Guerrero(
@@ -52,6 +55,10 @@ public class Guerrero extends Personaje {
 
     public int getHackeo() {
         return hackeo;
+    }
+
+    public int getVision() {
+        return vision;
     }
 
 }

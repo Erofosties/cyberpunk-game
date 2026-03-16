@@ -3,6 +3,7 @@ package com.cyberpunk.controller;
 import org.springframework.web.bind.annotation.*;
 
 import com.cyberpunk.domain.colonia.Colonia;
+import com.cyberpunk.dto.DesplegarNaveRequest;
 import com.cyberpunk.service.ColoniaService;
 
 @RestController
@@ -19,9 +20,17 @@ public class ColoniaController {
     public Colonia obtenerColonia(@PathVariable Long id) {
         return coloniaService.obtenerColonia(id);
     }
+    @PostMapping("/{id}/desplegar")
+    public String desplegarNave(
+            @PathVariable Long id,
+            @RequestBody DesplegarNaveRequest request) {
 
-    @PostMapping("/{id}/procesar")
-    public void procesarConstrucciones(@PathVariable Long id) {
-        coloniaService.procesarConstrucciones(id);
+        coloniaService.desplegarNave(
+                id,
+                request.getX(),
+                request.getY()
+        );
+
+        return "Nave desplegada";
     }
 }

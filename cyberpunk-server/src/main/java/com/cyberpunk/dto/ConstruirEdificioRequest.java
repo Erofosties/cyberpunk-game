@@ -1,17 +1,10 @@
 package com.cyberpunk.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 public class ConstruirEdificioRequest {
 
-    @NotNull
     private Long coloniaId;
-
-    @NotBlank
     private String tipoEdificio;
-
-    public ConstruirEdificioRequest() {}
+    private Long sectorId;
 
     public Long getColoniaId() {
         return coloniaId;
@@ -29,11 +22,11 @@ public class ConstruirEdificioRequest {
         this.tipoEdificio = tipoEdificio;
     }
 
-    @Override
-    public String toString() {
-        return "ConstruirEdificioRequest{" +
-                "coloniaId=" + coloniaId +
-                ", tipoEdificio='" + tipoEdificio + '\'' +
-                '}';
+    public Long getSectorId() {
+        return sectorId;
+    }
+
+    public void setSectorId(Long sectorId) {
+        this.sectorId = sectorId;
     }
 }

@@ -8,14 +8,20 @@ import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.dto.CrearPersonajeRequest;
 import com.cyberpunk.repository.ColoniaRepository;
+import com.cyberpunk.repository.PersonajeRepository;
 
 @Service
 public class PersonajeService {
 
     private final ColoniaRepository coloniaRepository;
+    private final PersonajeRepository personajeRepository;
 
-    public PersonajeService(ColoniaRepository coloniaRepository) {
+    public PersonajeService(
+            ColoniaRepository coloniaRepository,
+            PersonajeRepository personajeRepository) {
+
         this.coloniaRepository = coloniaRepository;
+        this.personajeRepository = personajeRepository;
     }
 
     public Personaje crearPersonaje(CrearPersonajeRequest r) {
@@ -67,14 +73,32 @@ public class PersonajeService {
             );
 
         } else {
-
             throw new RuntimeException("Tipo de personaje no válido");
         }
 
         colonia.addPersonaje(personaje);
-
         coloniaRepository.save(colonia);
 
         return personaje;
+    }
+
+    /* PERSONAJES INICIALES */
+
+    public void crearTrabajadorInicial(Colonia colonia, String nombre) {
+
+        Trabajador trabajador = new Trabajador(nombre, 2, 2, 1, 1);
+
+        trabajador.setColonia(colonia);
+
+        personajeRepository.save(trabajador);
+    }
+
+    public void crearGuerreroInicial(Colonia colonia, String nombre) {
+
+        Guerrero guerrero = new Guerrero(nombre, 2, 2, 1, 1);
+
+        guerrero.setColonia(colonia);
+
+        personajeRepository.save(guerrero);
     }
 }

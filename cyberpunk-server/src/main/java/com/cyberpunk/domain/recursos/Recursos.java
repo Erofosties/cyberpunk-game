@@ -117,7 +117,36 @@ public class Recursos {
             case EXPLORACION -> exploracion;
         };
     }
+    // Comida
+    public ResourceType consumirComidaDisponible() {
 
+        if (kromafruta > 0) {
+            kromafruta--;
+            return ResourceType.KROMAFRUTA;
+        }
+
+        if (algacarne > 0) {
+            algacarne--;
+            return ResourceType.ALGACARNE;
+        }
+
+        if (neurotrigo > 0) {
+            neurotrigo--;
+            return ResourceType.NEUROTRIGO;
+        }
+
+        if (ratax > 0) {
+            ratax--;
+            return ResourceType.RATAX;
+        }
+
+        if (florsomnio > 0) {
+            florsomnio--;
+            return ResourceType.FLORSOMNIO;
+        }
+
+        return null;
+    }
     // ================= COSTES =================
 
     public boolean tieneSuficiente(Map<ResourceType, Integer> coste) {

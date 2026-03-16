@@ -12,8 +12,16 @@ public class GameBalance {
     private static final Map<TipoEdificio, Integer> PRODUCCION_BASE = new EnumMap<>(TipoEdificio.class);
     private static final Map<TipoEdificio, Integer> ENERGIA_BASE = new EnumMap<>(TipoEdificio.class);
     private static final Map<TipoEdificio, Integer> TIEMPO_BASE = new EnumMap<>(TipoEdificio.class);
-
+    private static final Map<ResourceType, Integer> COMIDA_RECUPERACION = new EnumMap<>(ResourceType.class);
+    
     static {
+    	// ===== RECUPERACIÓN DE HAMBRE =====
+
+    	COMIDA_RECUPERACION.put(ResourceType.KROMAFRUTA, 15);
+    	COMIDA_RECUPERACION.put(ResourceType.ALGACARNE, 20);
+    	COMIDA_RECUPERACION.put(ResourceType.NEUROTRIGO, 25);
+    	COMIDA_RECUPERACION.put(ResourceType.RATAX, 30);
+    	COMIDA_RECUPERACION.put(ResourceType.FLORSOMNIO, 35);
 
         // ===== MINAS =====
 
@@ -99,7 +107,9 @@ public class GameBalance {
     public static Map<ResourceType, Integer> getCosteBase(TipoEdificio tipo) {
         return COSTES_BASE.get(tipo);
     }
-
+    public static int getRecuperacionHambre(ResourceType comida) {
+        return COMIDA_RECUPERACION.getOrDefault(comida, 0);
+    }
     public static int getProduccionBase(TipoEdificio tipo) {
         return PRODUCCION_BASE.getOrDefault(tipo, 0);
     }
