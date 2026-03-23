@@ -1,9 +1,10 @@
 package com.cyberpunk.domain.defensa;
 
-import jakarta.persistence.*;
-
-import com.cyberpunk.domain.colonia.Colonia;
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "defensas")
@@ -20,10 +21,6 @@ public class Defensas {
     private int canonesHexalium;
 
     private int integridadNave;
-
-    @OneToOne(mappedBy = "defensas")
-    @JsonBackReference
-    private Colonia colonia;
 
     // Constructor obligatorio JPA
     public Defensas() {
@@ -48,6 +45,23 @@ public class Defensas {
         int poderCanones = canonesHexalium * 70;
 
         return poderEscudos + poderTorretas + poderCanones;
+    }
+
+    public int getPenalizacionExploracion() {
+        return escudos * 2;
+    }
+
+    public int calcularDanioConstanteAtaque(boolean objetivoEsNave) {
+        int base = (torretasNeocromo * 3) + (canonesHexalium * 5);
+        return objetivoEsNave ? base : Math.max(1, base / 2);
+    }
+
+    public boolean defensasActivas() {
+        return torretasNeocromo > 0 || canonesHexalium > 0;
+    }
+
+    public void recibirAtaqueEnSector(int fuerzaEnemiga) {
+        dañarEstructuras(Math.max(1, fuerzaEnemiga / 2));
     }
 
     public void recibirAtaque(int fuerzaEnemiga) {
@@ -117,6 +131,4 @@ public class Defensas {
     public int getCanonesHexalium() { return canonesHexalium; }
 
     public int getIntegridadNave() { return integridadNave; }
-
-    public Colonia getColonia() { return colonia; }
 }

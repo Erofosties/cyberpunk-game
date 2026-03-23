@@ -1,5 +1,7 @@
 package com.cyberpunk.domain.personaje;
 
+import java.util.Random;
+
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.map.MapSector;
@@ -8,7 +10,17 @@ import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.cyberpunk.gameBalance.GameBalance;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorColumn;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PostLoad;
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -23,9 +35,16 @@ public abstract class Personaje {
 
     private int vida;
 
-    private int hambre = 100;
+    private int vidaMaxima;
+
+    @Column(name = "hambre")
+    private int comida = GameBalance.MAX_COMIDA_PERSONAJE;
 
     private int cansancio = 0;
+
+    private boolean incapacitado = false;
+
+    private int metabolismoAcumulado = 0;
 
     // NUEVO: sector donde trabaja
     @ManyToOne
@@ -37,6 +56,12 @@ public abstract class Personaje {
     private ConstruccionEnCurso construccionAsignada;
 
     @ManyToOne
+    @JoinColumn(name = "sector_transito_id")
+    private MapSector sectorTransito;
+
+    private int ticksViajeRestantes = 0;
+
+    @ManyToOne
     @JoinColumn(name = "colonia_id")
     @JsonBackReference
     private Colonia colonia;
@@ -46,23 +71,43 @@ public abstract class Personaje {
     public Personaje(String nombre, int vida) {
         this.nombre = nombre;
         this.vida = vida;
+        this.vidaMaxima = vida;
+    }
+
+    @SuppressWarnings("unused")
+    @PostLoad
+    private void inicializarVidaMaximaSiHaceFalta() {
+        if (vidaMaxima <= 0) {
+            vidaMaxima = inferirVidaMaxima();
+            if (vida > vidaMaxima) {
+                vida = vidaMaxima;
+            }
+        }
     }
 
     // ================= TICK BIOLÓGICO =================
 
-    public void tickHambre() {
+    public void acumularConsumoComida(int puntos) {
 
-        hambre -= 1;
+        metabolismoAcumulado += puntos;
 
-        if (hambre < 0)
-            hambre = 0;
+        int consumo = metabolismoAcumulado / GameBalance.METABOLISMO_PUNTOS_POR_COMIDA;
+        metabolismoAcumulado = metabolismoAcumulado % GameBalance.METABOLISMO_PUNTOS_POR_COMIDA;
+
+        if (consumo > 0) {
+            consumirComida(consumo);
+        }
     }
 
     public boolean estaDisponible() {
 
-        return sectorAsignado == null && construccionAsignada == null;
+        return puedeActuar() && !estaEnViaje() && sectorAsignado == null && construccionAsignada == null;
     }
     public MapSector getSectorActual() {
+
+        if (estaEnViaje() && sectorTransito != null) {
+            return sectorTransito;
+        }
 
         if (sectorAsignado != null) {
             return sectorAsignado;
@@ -76,32 +121,31 @@ public abstract class Personaje {
     }
     public void descansar() {
 
-        if (hambre <= 0)
+        if (!puedeActuar())
+            return;
+
+        if (comida <= 0)
             return;
 
         if (cansancio <= 0)
             return;
 
         reducirCansancio(3);
-        reducirHambre(1);
     }
 
     public void intentarComer(Recursos recursos) {
 
-        if (hambre > 40)
+        if (comida > GameBalance.UMBRAL_AUTO_CONSUMO_COMIDA)
             return;
 
-        if (!estaDisponible())
+        ResourceType tipoComida = recursos.consumirComidaDisponible();
+
+        if (tipoComida == null)
             return;
 
-        ResourceType comida = recursos.consumirComidaDisponible();
+        int recuperacion = GameBalance.getRecuperacionComida(tipoComida);
 
-        if (comida == null)
-            return;
-
-        int recuperacion = GameBalance.getRecuperacionHambre(comida);
-
-        comer(recuperacion);
+        recuperarComida(recuperacion);
     }
 
     // ================= CANSANCIO =================
@@ -122,22 +166,104 @@ public abstract class Personaje {
             cansancio = 0;
     }
 
-    // ================= HAMBRE =================
+    // ================= COMIDA =================
 
-    public void reducirHambre(int cantidad) {
+    public void consumirComida(int cantidad) {
 
-        hambre -= cantidad;
+        comida -= cantidad;
 
-        if (hambre < 0)
-            hambre = 0;
+        if (comida < 0)
+            comida = 0;
     }
 
-    public void comer(int cantidad) {
+    public void recuperarComida(int cantidad) {
 
-        hambre += cantidad;
+        comida += cantidad;
 
-        if (hambre > 100)
-            hambre = 100;
+        if (comida > GameBalance.MAX_COMIDA_PERSONAJE)
+            comida = GameBalance.MAX_COMIDA_PERSONAJE;
+    }
+
+    public boolean sinComida() {
+        return comida <= 0;
+    }
+
+    public void recibirDanio(int cantidad) {
+
+        if (cantidad <= 0 || incapacitado)
+            return;
+
+        vida -= cantidad;
+
+        if (vida <= 0) {
+            incapacitar();
+        }
+    }
+
+    public void curar(int cantidad) {
+
+        if (cantidad <= 0)
+            return;
+
+        vida += cantidad;
+
+        if (vida > vidaMaxima)
+            vida = vidaMaxima;
+
+        if (vida > 0) {
+            incapacitado = false;
+        }
+    }
+
+    public boolean estaHerido() {
+        return vida < vidaMaxima;
+    }
+
+    public boolean puedeActuar() {
+        return !incapacitado && vida > 0;
+    }
+
+    public boolean estaEnViaje() {
+        return ticksViajeRestantes > 0;
+    }
+
+    public void iniciarViaje(MapSector origen, int ticks) {
+        this.sectorTransito = origen;
+        this.ticksViajeRestantes = Math.max(0, ticks);
+    }
+
+    public boolean avanzarViaje() {
+        if (ticksViajeRestantes <= 0) {
+            return false;
+        }
+
+        ticksViajeRestantes--;
+
+        if (ticksViajeRestantes == 0) {
+            sectorTransito = null;
+            return true;
+        }
+
+        return false;
+    }
+
+    public void forzarReposo() {
+        this.sectorAsignado = null;
+        this.construccionAsignada = null;
+    }
+
+    private void incapacitar() {
+        vida = 0;
+        incapacitado = true;
+        forzarReposo();
+        perderAtributoAleatorio(new Random());
+    }
+
+    private int inferirVidaMaxima() {
+        if (this instanceof Guerrero) {
+            return 120;
+        }
+        return 100;
     }
 
     // ================= GETTERS =================
@@ -154,12 +280,20 @@ public abstract class Personaje {
         return vida;
     }
 
-    public int getHambre() {
-        return hambre;
+    public int getVidaMaxima() {
+        return vidaMaxima;
+    }
+
+    public int getComida() {
+        return comida;
     }
 
     public int getCansancio() {
         return cansancio;
+    }
+
+    public boolean isIncapacitado() {
+        return incapacitado;
     }
 
     public Colonia getColonia() {
@@ -168,6 +302,14 @@ public abstract class Personaje {
 
     public MapSector getSectorAsignado() {
         return sectorAsignado;
+    }
+
+    public MapSector getSectorTransito() {
+        return sectorTransito;
+    }
+
+    public int getTicksViajeRestantes() {
+        return ticksViajeRestantes;
     }
 
     public ConstruccionEnCurso getConstruccionAsignada() {
@@ -191,4 +333,6 @@ public abstract class Personaje {
     // ================= PRODUCCIÓN =================
 
     public abstract int getProduccion();
+
+    protected abstract void perderAtributoAleatorio(Random random);
 }

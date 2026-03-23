@@ -1,6 +1,7 @@
 package com.cyberpunk.controller;
 
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.dto.DesplegarNaveRequest;
@@ -23,7 +24,7 @@ public class ColoniaController {
     @PostMapping("/{id}/desplegar")
     public String desplegarNave(
             @PathVariable Long id,
-            @RequestBody DesplegarNaveRequest request) {
+            @Valid @RequestBody DesplegarNaveRequest request) {
 
         coloniaService.desplegarNave(
                 id,

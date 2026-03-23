@@ -3,6 +3,7 @@ package com.cyberpunk.controller;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import com.cyberpunk.domain.usuario.Usuario;
 import com.cyberpunk.dto.CrearUsuarioRequest;
@@ -19,7 +20,7 @@ public class UsuarioController {
     }
 
     @PostMapping
-    public Usuario crearUsuario(@RequestBody CrearUsuarioRequest request) {
+    public Usuario crearUsuario(@Valid @RequestBody CrearUsuarioRequest request) {
 
         return usuarioService.crearUsuario(
                 request.getUsername(),

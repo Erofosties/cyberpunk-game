@@ -1,5 +1,6 @@
 package com.cyberpunk.service;
 
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
@@ -9,13 +10,20 @@ import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.edificio.CosteEdificioCalculator;
 import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 import com.cyberpunk.domain.map.MapSector;
+import com.cyberpunk.domain.map.MapSector.SectorResource;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.recursos.Recursos;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.cyberpunk.exception.EntityNotFoundException;
+import com.cyberpunk.exception.GameRuleViolationException;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.ConstruccionRepository;
 import com.cyberpunk.repository.MapSectorRepository;
 import com.cyberpunk.repository.PersonajeRepository;
+import com.cyberpunk.repository.SectorExplorationRepository;
+import com.cyberpunk.util.TravelCalculator;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class EdificioService {
@@ -24,29 +32,60 @@ public class EdificioService {
     private final ConstruccionRepository construccionRepository;
     private final PersonajeRepository personajeRepository;
     private final MapSectorRepository mapSectorRepository;
+    private final SectorExplorationRepository sectorExplorationRepository;
 
     public EdificioService(
             ColoniaRepository coloniaRepository,
             PersonajeRepository personajeRepository,
             ConstruccionRepository construccionRepository,
-            MapSectorRepository mapSectorRepository) {
+            MapSectorRepository mapSectorRepository,
+            SectorExplorationRepository sectorExplorationRepository) {
 
         this.coloniaRepository = coloniaRepository;
         this.personajeRepository = personajeRepository;
         this.construccionRepository = construccionRepository;
         this.mapSectorRepository = mapSectorRepository;
+        this.sectorExplorationRepository = sectorExplorationRepository;
     }
 
     // ================= CONSTRUIR =================
 
+    @Transactional
+    @SuppressWarnings("null")
     public void construirEdificio(Long coloniaId, String tipoEdificio, Long sectorId) {
+        if (coloniaId == null) {
+            throw new IllegalArgumentException("El ID de la colonia no puede ser null");
+        }
+        if (tipoEdificio == null || tipoEdificio.trim().isEmpty()) {
+            throw new IllegalArgumentException("El tipo de edificio no puede ser null o vacío");
+        }
+        if (sectorId == null) {
+            throw new IllegalArgumentException("El ID del sector no puede ser null");
+        }
 
         Colonia colonia = coloniaRepository.findById(coloniaId)
-                .orElseThrow(() -> new RuntimeException("Colonia no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
 
         MapSector sector = mapSectorRepository.findById(sectorId)
-                .orElseThrow(() -> new RuntimeException("Sector no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Sector no encontrado"));
 
+        // ✅ Verificar que el sector haya sido explorado por este usuario
+        boolean explorado = sectorExplorationRepository.existsByUsuarioIdAndSectorId(
+            colonia.getUsuario().getId(),
+            sector.getId());
+
+        if (!explorado) {
+            throw new RuntimeException("El sector debe estar explorado antes de construir");
+        }
+
+        // ✅ REGLA CORRECTA DE OWNERSHIP
+        if (sector.getOwner() != null &&
+                !sector.getOwner().getId().equals(colonia.getUsuario().getId())) {
+
+            throw new RuntimeException("No puedes construir en un sector enemigo");
+        }
+
+        // ❌ ya tiene edificio
         if (sector.getBuilding() != null) {
             throw new RuntimeException("El sector ya tiene un edificio");
         }
@@ -59,6 +98,10 @@ public class EdificioService {
             throw new RuntimeException("Tipo de edificio inválido");
         }
 
+        // ✅ VALIDAR COMPATIBILIDAD RECURSO-EDIFICIO
+        validarCompatibilidadRecursoEdificio(sector, tipo);
+
+        // ✅ COSTE
         Recursos recursos = colonia.getRecursos();
 
         Map<ResourceType, Integer> coste =
@@ -70,6 +113,10 @@ public class EdificioService {
 
         recursos.consumir(coste);
 
+        // ✅ CLAIM DEL SECTOR (CLAVE GAMEPLAY)
+        sector.setOwner(colonia.getUsuario());
+
+        // ✅ CREAR CONSTRUCCIÓN
         ConstruccionEnCurso construccion =
                 new ConstruccionEnCurso(tipo.name(), sector);
 
@@ -80,37 +127,113 @@ public class EdificioService {
 
     // ================= ASIGNAR CONSTRUCCIÓN =================
 
+    @SuppressWarnings("null")
     public void asignarTrabajadorConstruccion(Long personajeId, Long construccionId) {
+        if (personajeId == null) {
+            throw new IllegalArgumentException("El ID del personaje no puede ser null");
+        }
+        if (construccionId == null) {
+            throw new IllegalArgumentException("El ID de la construcción no puede ser null");
+        }
 
         Personaje personaje = personajeRepository.findById(personajeId)
-                .orElseThrow(() -> new RuntimeException("Personaje no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
+
+        if (!personaje.puedeActuar()) {
+            throw new GameRuleViolationException("El personaje está incapacitado y no puede trabajar");
+        }
 
         ConstruccionEnCurso construccion = construccionRepository.findById(construccionId)
-                .orElseThrow(() -> new RuntimeException("Construccion no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Construcción no encontrada"));
 
+        MapSector origen = personaje.getSectorActual();
         personaje.setSectorAsignado(null);
         personaje.setConstruccionAsignada(construccion);
+        personaje.iniciarViaje(origen, TravelCalculator.calcularTicks(origen, construccion.getSectorDestino()));
 
         personajeRepository.save(personaje);
     }
 
     // ================= ASIGNAR SECTOR =================
 
+    @SuppressWarnings("null")
     public void asignarTrabajadorSector(Long personajeId, Long sectorId) {
+        if (personajeId == null) {
+            throw new IllegalArgumentException("El ID del personaje no puede ser null");
+        }
+        if (sectorId == null) {
+            throw new IllegalArgumentException("El ID del sector no puede ser null");
+        }
 
         Personaje personaje = personajeRepository.findById(personajeId)
-                .orElseThrow(() -> new RuntimeException("Personaje no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
+
+        if (!personaje.puedeActuar()) {
+            throw new GameRuleViolationException("El personaje está incapacitado y no puede trabajar");
+        }
 
         MapSector sector = mapSectorRepository.findById(sectorId)
-                .orElseThrow(() -> new RuntimeException("Sector no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Sector no encontrado"));
 
         if (sector.getBuilding() == null) {
             throw new RuntimeException("El sector no tiene edificio");
         }
 
-        personaje.setConstruccionAsignada(null);
+        MapSector origen = personaje.getSectorActual();
+
+        // Asignar sector
         personaje.setSectorAsignado(sector);
 
+        // Si hay construcción en curso en este sector, asignar a ella
+        Colonia colonia = personaje.getColonia();
+        for (ConstruccionEnCurso construccion : colonia.getColaConstruccion()) {
+            if (construccion.getSectorDestino().equals(sector)) {
+                personaje.setConstruccionAsignada(construccion);
+                break;
+            }
+        }
+
+        personaje.iniciarViaje(origen, TravelCalculator.calcularTicks(origen, sector));
+
         personajeRepository.save(personaje);
+    }
+
+    public List<ConstruccionEnCurso> getConstrucciones(Long coloniaId) {
+        if (coloniaId == null) {
+            throw new IllegalArgumentException("El ID de la colonia no puede ser null");
+        }
+        Colonia colonia = coloniaRepository.findById(coloniaId)
+                .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
+        return colonia.getColaConstruccion();
+    }
+
+    private static final Map<TipoEdificio, SectorResource> RECURSO_REQUERIDO = Map.ofEntries(
+        Map.entry(TipoEdificio.MINA_NEOCROMO,       SectorResource.NEOCROMO),
+        Map.entry(TipoEdificio.MINA_UMBRIUM,         SectorResource.UMBRIUM),
+        Map.entry(TipoEdificio.MINA_SYNTHERIUM,      SectorResource.SYNTHERIUM),
+        Map.entry(TipoEdificio.MINA_HEXALIUM,        SectorResource.HEXALIUM),
+        Map.entry(TipoEdificio.MINA_VOIDIUM,         SectorResource.VOIDIUM),
+        Map.entry(TipoEdificio.GRANJA_KROMAFRUTA,    SectorResource.KROMAFRUTA),
+        Map.entry(TipoEdificio.GRANJA_NEUROTRIGO,    SectorResource.NEUROTRIGO),
+        Map.entry(TipoEdificio.GRANJA_ALGACARNE,     SectorResource.ALGACARNE),
+        Map.entry(TipoEdificio.CRIADERO_RATAX,       SectorResource.RATAX),
+        Map.entry(TipoEdificio.CULTIVO_FLORSOMNIO,   SectorResource.FLORSOMNIO),
+        Map.entry(TipoEdificio.LAB_REFLEXA,          SectorResource.REFLEXA),
+        Map.entry(TipoEdificio.LAB_NANOCURA,         SectorResource.NANOCURA),
+        Map.entry(TipoEdificio.LAB_SOMNEX,           SectorResource.SOMNEX)
+    );
+
+    private void validarCompatibilidadRecursoEdificio(MapSector sector, TipoEdificio tipo) {
+        SectorResource recursoRequerido = RECURSO_REQUERIDO.get(tipo);
+        if (recursoRequerido == null) return; // PLACA_SOLAR, REACTOR_FUSION, etc. — sin restricción
+
+        SectorResource recursoSector = sector.getResource();
+        if (recursoSector != recursoRequerido) {
+            throw new GameRuleViolationException(
+                "No puedes construir " + tipo.name() + " aquí. " +
+                "Requiere el recurso " + recursoRequerido.name() +
+                ", pero este sector tiene: " + recursoSector.name()
+            );
+        }
     }
 }

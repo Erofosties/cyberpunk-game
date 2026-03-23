@@ -1,7 +1,7 @@
 package com.cyberpunk.domain.edificio;
 
-import java.util.Map;
 import java.util.EnumMap;
+import java.util.Map;
 
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.cyberpunk.gameBalance.GameBalance;
@@ -16,6 +16,9 @@ public class CosteEdificioCalculator {
             int nivelActual) {
 
         Map<ResourceType, Integer> base = GameBalance.getCosteBase(tipo);
+        if (base == null) {
+            throw new IllegalStateException("No hay coste base configurado para el edificio: " + tipo);
+        }
 
         Map<ResourceType, Integer> costeFinal = new EnumMap<>(ResourceType.class);
 

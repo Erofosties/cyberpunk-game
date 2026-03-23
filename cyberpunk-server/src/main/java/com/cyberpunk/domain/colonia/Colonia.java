@@ -1,6 +1,5 @@
 package com.cyberpunk.domain.colonia;
 
-import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -10,9 +9,19 @@ import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.recursos.Recursos;
 import com.cyberpunk.domain.usuario.Usuario;
-
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "colonias")
@@ -35,7 +44,7 @@ public class Colonia {
 
     @OneToMany(mappedBy = "colonia", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
-    private List<Personaje> poblacion = new ArrayList<>();
+    private final List<Personaje> poblacion = new ArrayList<>();
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "recursos_id")
@@ -43,12 +52,11 @@ public class Colonia {
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "defensas_id")
-    @JsonManagedReference
     private Defensas defensas;
 
     @OneToMany(mappedBy = "colonia", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
-    private List<ConstruccionEnCurso> colaConstruccion = new LinkedList<>();
+    private final List<ConstruccionEnCurso> colaConstruccion = new LinkedList<>();
     
     //Edificios de nave
     private int placasSolares = 1;
@@ -83,6 +91,10 @@ public class Colonia {
 
     public MapSector getSectorNave() { return sectorNave; }
 
+    public int getPlacasSolares() { return placasSolares; }
+
+    public int getBaterias() { return baterias; }
+
     // ================= RELACIONES =================
 
     public void setUsuario(Usuario usuario) {
@@ -93,17 +105,27 @@ public class Colonia {
         this.sectorNave = sectorNave;
     }
 
+    public void setRecursos(Recursos recursos) {
+        this.recursos = recursos;
+    }
+
+    public void setDefensas(Defensas defensas) {
+        this.defensas = defensas;
+    }
+
+    public void setPlacasSolares(int placasSolares) {
+        this.placasSolares = placasSolares;
+    }
+
+    public void setBaterias(int baterias) {
+        this.baterias = baterias;
+    }
+
     public void addPersonaje(Personaje p) {
         poblacion.add(p);
         p.setColonia(this);
     }
-    public int getPlacasSolares() {
-        return placasSolares;
-    }
 
-    public int getBaterias() {
-        return baterias;
-    }
     public void addConstruccion(ConstruccionEnCurso construccion) {
         colaConstruccion.add(construccion);
         construccion.setColonia(this);

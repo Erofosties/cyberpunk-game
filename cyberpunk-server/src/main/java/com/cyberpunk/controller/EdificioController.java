@@ -1,8 +1,16 @@
 package com.cyberpunk.controller;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.dto.AsignarConstruccionRequest;
 import com.cyberpunk.dto.AsignarSectorTrabajoRequest;
 import com.cyberpunk.dto.ConstruirEdificioRequest;
@@ -61,5 +69,12 @@ public class EdificioController {
         );
 
         return ResponseEntity.ok("Trabajador asignado a sector");
+    }
+
+    // ================= VER CONSTRUCCIONES =================
+
+    @GetMapping("/construcciones/{coloniaId}")
+    public List<ConstruccionEnCurso> getConstrucciones(@PathVariable Long coloniaId) {
+        return edificioService.getConstrucciones(coloniaId);
     }
 }

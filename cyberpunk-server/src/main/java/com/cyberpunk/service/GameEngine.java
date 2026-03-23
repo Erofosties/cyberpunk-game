@@ -25,20 +25,21 @@ public class GameEngine {
     private final MapSectorRepository mapSectorRepository;
     private final PersonajeRepository personajeRepository;
     private final ExplorationService explorationService;
+    private final GuerreroService guerreroService;
 
     public GameEngine(
             ColoniaRepository coloniaRepository,
             MapSectorRepository mapSectorRepository,
             PersonajeRepository personajeRepository,
-            ExplorationService explorationService) {
+            ExplorationService explorationService,
+            GuerreroService guerreroService) {
 
         this.coloniaRepository = coloniaRepository;
         this.mapSectorRepository = mapSectorRepository;
         this.personajeRepository = personajeRepository;
         this.explorationService = explorationService;
+        this.guerreroService = guerreroService;
     }
-
-    // ================= TICK =================
 
     @Scheduled(fixedRate = 10000)
     @Transactional
@@ -48,11 +49,16 @@ public class GameEngine {
 
         for (Colonia colonia : colonias) {
 
+            procesarViajes(colonia);
+            guerreroService.resolverMisionesAlLlegar(colonia);
+
             procesarConstrucciones(colonia);
             procesarProduccion(colonia);
 
-            procesarHambre(colonia);
-            procesarComida(colonia);
+            procesarConsumoComida(colonia);
+            procesarAlimentacion(colonia);
+            procesarDanioPorInanicion(colonia);
+            procesarCuracionNatural(colonia);
             procesarDescanso(colonia);
             procesarExploracion(colonia);
         }
@@ -66,11 +72,19 @@ public class GameEngine {
 
     private void procesarExploracion(Colonia colonia) {
 
+        // No ocultamos toda la visibilidad cada tick.
+        // Mantener exploración persistente evita que el mapa se convierta en 'f' tras un tick.
+        // explorationService.ocultarVisibilidad(usuarioId);
+
         List<Personaje> personajes = personajeRepository.findByColonia(colonia);
 
         for (Personaje personaje : personajes) {
 
-            if (personaje instanceof Guerrero guerrero) {
+            if (personaje instanceof Guerrero guerrero && guerrero.puedeActuar()) {
+
+                if (guerrero.estaEnViaje()) {
+                    continue;
+                }
 
                 explorationService.revelarAlrededor(guerrero);
             }
@@ -94,7 +108,6 @@ public class GameEngine {
             if (construccion.completada()) {
 
                 crearEdificio(construccion, colonia);
-
                 liberarTrabajadoresConstruccion(colonia, construccion);
 
                 completadas.add(construccion);
@@ -111,13 +124,27 @@ public class GameEngine {
         for (Personaje personaje : colonia.getPoblacion()) {
 
             if (personaje instanceof Trabajador trabajador
-                    && trabajador.getConstruccionAsignada() != null
-                    && trabajador.getConstruccionAsignada().getId().equals(construccion.getId())
-                    && trabajador.getCansancio() < 100) {
+                    && trabajador.getConstruccionAsignada() == construccion) {
+
+                if (!trabajador.puedeActuar()) {
+                    continue;
+                }
+
+                if (trabajador.estaEnViaje()) {
+                    continue;
+                }
+
+                if (trabajador.getCansancio() >= 100) {
+                    enviarTrabajadorANavePorAgotamiento(trabajador);
+                    continue;
+                }
 
                 progreso += trabajador.getIngenieria();
-
                 trabajador.aumentarCansancio(2);
+
+                if (trabajador.getCansancio() >= 100) {
+                    enviarTrabajadorANavePorAgotamiento(trabajador);
+                }
             }
         }
 
@@ -129,6 +156,10 @@ public class GameEngine {
         MapSector sector = construccion.getSectorDestino();
 
         if (sector == null)
+            return;
+
+        // Protección extra
+        if (sector.getBuilding() != null)
             return;
 
         sector.setBuilding(
@@ -149,11 +180,23 @@ public class GameEngine {
             if (!(personaje instanceof Trabajador trabajador))
                 continue;
 
+            if (!trabajador.puedeActuar())
+                continue;
+
+            if (trabajador.estaEnViaje())
+                continue;
+
             if (trabajador.getSectorAsignado() == null)
                 continue;
 
-            if (trabajador.getCansancio() >= 100)
+            // 🔴 IMPORTANTE: evitar producir mientras construye
+            if (trabajador.getConstruccionAsignada() != null)
                 continue;
+
+            if (trabajador.getCansancio() >= 100) {
+                enviarTrabajadorANavePorAgotamiento(trabajador);
+                continue;
+            }
 
             MapSector sector = trabajador.getSectorAsignado();
 
@@ -169,9 +212,7 @@ public class GameEngine {
         var tipo = sector.getBuilding();
 
         int habilidad = trabajador.getProduccionParaEdificio(tipo);
-
         int base = com.cyberpunk.gameBalance.GameBalance.getProduccionBase(tipo);
-
         double riqueza = sector.getRichness();
 
         int produccion = (int) (base * habilidad * riqueza);
@@ -179,11 +220,14 @@ public class GameEngine {
         var recurso = convertirRecurso(tipo);
 
         if (recurso != null) {
-
             colonia.getRecursos().add(recurso, produccion);
         }
 
         trabajador.aumentarCansancio(1);
+
+        if (trabajador.getCansancio() >= 100) {
+            enviarTrabajadorANavePorAgotamiento(trabajador);
+        }
     }
 
     private com.cyberpunk.domain.recursos.Recursos.ResourceType convertirRecurso(Edificio.TipoEdificio tipo) {
@@ -212,38 +256,90 @@ public class GameEngine {
 
     // ================= UTILIDADES =================
 
+    private void procesarViajes(Colonia colonia) {
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+            personaje.avanzarViaje();
+        }
+    }
+
     private void liberarTrabajadoresConstruccion(Colonia colonia, ConstruccionEnCurso construccion) {
 
         for (Personaje personaje : colonia.getPoblacion()) {
 
             if (personaje instanceof Trabajador trabajador) {
 
-                if (trabajador.getConstruccionAsignada() != null &&
-                        trabajador.getConstruccionAsignada().getId().equals(construccion.getId())) {
-
+                if (trabajador.getConstruccionAsignada() == construccion) {
+                    MapSector origen = trabajador.getSectorAsignado() != null
+                            ? trabajador.getSectorAsignado()
+                            : construccion.getSectorDestino();
                     trabajador.setConstruccionAsignada(null);
+                    trabajador.setSectorAsignado(null);
+                    trabajador.iniciarViaje(origen, com.cyberpunk.util.TravelCalculator.calcularTicks(origen, colonia.getSectorNave()));
                 }
             }
         }
     }
 
-    // ================= SISTEMA BIOLÓGICO =================
-
-    private void procesarHambre(Colonia colonia) {
-
-        for (Personaje personaje : colonia.getPoblacion()) {
-
-            personaje.tickHambre();
+    private void enviarTrabajadorANavePorAgotamiento(Trabajador trabajador) {
+        MapSector origen = trabajador.getSectorActual();
+        trabajador.setConstruccionAsignada(null);
+        trabajador.setSectorAsignado(null);
+        if (trabajador.getColonia() != null) {
+            trabajador.iniciarViaje(origen, com.cyberpunk.util.TravelCalculator.calcularTicks(origen, trabajador.getColonia().getSectorNave()));
         }
     }
 
-    private void procesarComida(Colonia colonia) {
+    // ================= SISTEMA BIOLÓGICO =================
+
+    private void procesarConsumoComida(Colonia colonia) {
+        for (Personaje personaje : colonia.getPoblacion()) {
+            personaje.acumularConsumoComida(calcularConsumoComida(personaje));
+        }
+    }
+
+    private int calcularConsumoComida(Personaje personaje) {
+
+        if (personaje instanceof Trabajador trabajador) {
+
+            if (trabajador.getConstruccionAsignada() != null) {
+                return com.cyberpunk.gameBalance.GameBalance.CONSUMO_COMIDA_TRABAJANDO;
+            }
+
+            if (trabajador.getSectorAsignado() != null && trabajador.getSectorAsignado().getBuilding() != null) {
+                return com.cyberpunk.gameBalance.GameBalance.CONSUMO_COMIDA_TRABAJANDO;
+            }
+        }
+
+        return com.cyberpunk.gameBalance.GameBalance.CONSUMO_COMIDA_INACTIVO;
+    }
+
+    private void procesarAlimentacion(Colonia colonia) {
 
         var recursos = colonia.getRecursos();
 
         for (Personaje personaje : colonia.getPoblacion()) {
-
             personaje.intentarComer(recursos);
+        }
+    }
+
+    private void procesarDanioPorInanicion(Colonia colonia) {
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            if (personaje.sinComida()) {
+                personaje.recibirDanio(com.cyberpunk.gameBalance.GameBalance.DANO_POR_INANICION);
+            }
+        }
+    }
+
+    private void procesarCuracionNatural(Colonia colonia) {
+
+        for (Personaje personaje : colonia.getPoblacion()) {
+
+            if (personaje.estaHerido() && personaje.getComida() > 60) {
+                personaje.curar(com.cyberpunk.gameBalance.GameBalance.CURACION_NATURAL_POR_TICK);
+            }
         }
     }
 
@@ -252,7 +348,6 @@ public class GameEngine {
         for (Personaje personaje : colonia.getPoblacion()) {
 
             if (personaje.estaDisponible()) {
-
                 personaje.descansar();
             }
         }

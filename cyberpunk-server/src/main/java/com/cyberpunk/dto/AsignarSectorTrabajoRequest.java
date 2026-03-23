@@ -1,8 +1,13 @@
 package com.cyberpunk.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 public class AsignarSectorTrabajoRequest {
 
+    @NotNull(message = "El ID del personaje no puede ser nulo")
     private Long personajeId;
+    
+    @NotNull(message = "El ID del sector no puede ser nulo")
     private Long sectorId;
 
     public Long getPersonajeId() {

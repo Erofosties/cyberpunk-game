@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 import com.cyberpunk.domain.usuario.Usuario;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(
@@ -27,15 +28,15 @@ public class MapSector {
 
     private double richness;
 
-    // edificio presente en el sector
     @Enumerated(EnumType.STRING)
     private TipoEdificio building;
 
-    // nivel del edificio
-    private int buildingLevel = 1;
+    // 🔴 CORREGIDO
+    private int buildingLevel = 0;
 
     @ManyToOne
     @JoinColumn(name = "owner_id")
+    @JsonIgnore
     private Usuario owner;
 
     public MapSector() {}
@@ -46,6 +47,7 @@ public class MapSector {
         this.terrain = terrain;
         this.sectorResource = sectorResource;
         this.richness = richness;
+        this.buildingLevel = 0;
     }
 
     public boolean tieneEdificio() {
@@ -76,11 +78,13 @@ public class MapSector {
 
     public void setBuilding(TipoEdificio building) {
         this.building = building;
+        this.buildingLevel = 1; // 🔴 importante
     }
+
     public void setX(int x ) { this.x=x; }
 
     public void setY(int y) { this.y=y; }
-    
+
     public void setOwner(Usuario owner) {
         this.owner = owner;
     }
@@ -92,7 +96,6 @@ public class MapSector {
     // ================= ENUMS =================
 
     public enum TerrainType {
-
         LLANURA,
         MONTAÑA,
         BOSQUE,
@@ -101,23 +104,19 @@ public class MapSector {
     }
 
     public enum SectorResource {
-
         NEOCROMO,
         UMBRIUM,
         SYNTHERIUM,
         HEXALIUM,
         VOIDIUM,
-
         KROMAFRUTA,
         NEUROTRIGO,
         ALGACARNE,
         RATAX,
         FLORSOMNIO,
-
         REFLEXA,
         NANOCURA,
         SOMNEX,
-
         NONE
     }
 }

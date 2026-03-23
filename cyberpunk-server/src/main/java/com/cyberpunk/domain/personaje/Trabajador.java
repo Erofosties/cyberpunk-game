@@ -1,8 +1,14 @@
 package com.cyberpunk.domain.personaje;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
 import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 
-import jakarta.persistence.*;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "trabajadores")
@@ -90,4 +96,18 @@ public class Trabajador extends Personaje {
     public int getCiencia() { return ciencia; }
 
     public int getIngenieria() { return ingenieria; }
+
+    @Override
+    protected void perderAtributoAleatorio(Random random) {
+        List<Runnable> reductores = new ArrayList<>();
+
+        if (mineria > 0) reductores.add(() -> mineria--);
+        if (agricultura > 0) reductores.add(() -> agricultura--);
+        if (ciencia > 0) reductores.add(() -> ciencia--);
+        if (ingenieria > 0) reductores.add(() -> ingenieria--);
+
+        if (!reductores.isEmpty()) {
+            reductores.get(random.nextInt(reductores.size())).run();
+        }
+    }
 }

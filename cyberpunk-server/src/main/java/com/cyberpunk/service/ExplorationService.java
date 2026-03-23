@@ -1,6 +1,9 @@
 package com.cyberpunk.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.map.MapSector;
@@ -29,17 +32,40 @@ public class ExplorationService {
 
         MapSector sector = mapService.getOrGenerateSector(x, y);
 
+        // Verificar adyacencia si ya hay exploraciones visibles
+        List<SectorExploration> exploracionesVisibles = explorationRepository
+                .findByUsuarioIdAndVisibleTrue(usuario.getId());
+
+        if (!exploracionesVisibles.isEmpty()) {
+            boolean adyacente = exploracionesVisibles.stream()
+                    .anyMatch(exp -> {
+                        int dx = Math.abs(exp.getSector().getX() - x);
+                        int dy = Math.abs(exp.getSector().getY() - y);
+                        return Math.max(dx, dy) == 1;
+                    });
+
+            if (!adyacente) {
+                throw new RuntimeException("Solo puedes explorar sectores adyacentes al mapa conocido");
+            }
+        }
+
         explorationRepository
                 .findByUsuarioAndSector(usuario, sector)
-                .orElseGet(() -> {
-
-                    SectorExploration exploration =
-                            new SectorExploration(usuario, sector);
-
-                    return explorationRepository.save(exploration);
-                });
+                .ifPresentOrElse(
+                        existing -> {
+                            if (!existing.isVisible()) {
+                                existing.setVisible(true);
+                                explorationRepository.save(existing);
+                            }
+                        },
+                        () -> explorationRepository.save(new SectorExploration(usuario, sector))
+                );
 
         return sector;
+    }
+    @Transactional
+    public void ocultarVisibilidad(Long usuarioId) {
+        explorationRepository.ocultarTodosPorUsuario(usuarioId);
     }
 
     // ================= REVELAR ALREDEDOR DE GUERRERO =================
@@ -51,15 +77,22 @@ public class ExplorationService {
 
         MapSector base = guerrero.getSectorAsignado();
 
-        int baseX = base.getX();
-        int baseY = base.getY();
-
         int vision = guerrero.getVision();
 
         Usuario usuario = guerrero.getColonia().getUsuario();
 
-        for (int dx = -vision; dx <= vision; dx++) {
+        revelarDesdeSector(usuario, base, vision);
+    }
 
+    public void revelarDesdeSector(Usuario usuario, MapSector base, int vision) {
+
+        if (usuario == null || base == null)
+            return;
+
+        int baseX = base.getX();
+        int baseY = base.getY();
+
+        for (int dx = -vision; dx <= vision; dx++) {
             for (int dy = -vision; dy <= vision; dy++) {
 
                 int x = baseX + dx;
@@ -67,18 +100,41 @@ public class ExplorationService {
 
                 MapSector sector = mapService.getOrGenerateSector(x, y);
 
-                boolean explored =
-                        explorationRepository.existsByUsuarioAndSector(usuario, sector);
-
-                if (!explored) {
-
-                    SectorExploration exploration =
-                            new SectorExploration(usuario, sector);
-
-                    explorationRepository.save(exploration);
-                }
+                explorationRepository
+                    .findByUsuarioAndSector(usuario, sector)
+                    .ifPresentOrElse(
+                        existing -> {
+                            if (!existing.isVisible()) {
+                                existing.setVisible(true);
+                                explorationRepository.save(existing);
+                            }
+                        },
+                        () -> {
+                            explorationRepository.save(
+                                new SectorExploration(usuario, sector)
+                            );
+                        }
+                    );
             }
         }
+    }
+
+    public void marcarSectorVisible(Usuario usuario, MapSector sector) {
+        if (usuario == null || sector == null) {
+            return;
+        }
+
+        explorationRepository
+                .findByUsuarioAndSector(usuario, sector)
+                .ifPresentOrElse(
+                        existing -> {
+                            if (!existing.isVisible()) {
+                                existing.setVisible(true);
+                            }
+                            explorationRepository.save(existing);
+                        },
+                        () -> explorationRepository.save(new SectorExploration(usuario, sector))
+                );
     }
 
     // ================= REVELAR AL DESPLEGAR NAVE =================
@@ -101,16 +157,12 @@ public class ExplorationService {
 
                 MapSector sector = mapService.getOrGenerateSector(x, y);
 
-                boolean explored =
-                        explorationRepository.existsByUsuarioAndSector(usuario, sector);
+                SectorExploration exploration = explorationRepository
+                        .findByUsuarioAndSector(usuario, sector)
+                        .orElseGet(() -> new SectorExploration(usuario, sector));
 
-                if (!explored) {
-
-                    SectorExploration exploration =
-                            new SectorExploration(usuario, sector);
-
-                    explorationRepository.save(exploration);
-                }
+                exploration.setVisible(true);
+                explorationRepository.save(exploration);
             }
         }
     }

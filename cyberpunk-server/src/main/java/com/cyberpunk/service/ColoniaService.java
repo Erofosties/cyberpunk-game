@@ -7,13 +7,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.map.MapSector;
+import com.cyberpunk.exception.EntityNotFoundException;
+import com.cyberpunk.exception.GameRuleViolationException;
+import com.cyberpunk.gameBalance.GameBalance;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.MapSectorRepository;
 
 @Service
 public class ColoniaService {
-
-    private static final int DISTANCIA_MINIMA = 5;
 
     private final ColoniaRepository coloniaRepository;
     private final MapSectorRepository mapSectorRepository;
@@ -31,21 +32,24 @@ public class ColoniaService {
 
     @Transactional
     public void desplegarNave(Long coloniaId, int x, int y) {
+        if (coloniaId == null) {
+            throw new IllegalArgumentException("El ID de la colonia no puede ser null");
+        }
 
         Colonia colonia = coloniaRepository
                 .findById(coloniaId)
-                .orElseThrow(() -> new RuntimeException("Colonia no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
 
         if (colonia.getSectorNave() != null) {
-            throw new RuntimeException("La nave ya está desplegada");
+            throw new GameRuleViolationException("La nave ya está desplegada");
         }
 
         MapSector sector = mapSectorRepository
                 .findByXAndY(x, y)
-                .orElseThrow(() -> new RuntimeException("Sector no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Sector no encontrado"));
 
         if (sector.getOwner() != null) {
-            throw new RuntimeException("Sector ocupado por otro jugador");
+            throw new GameRuleViolationException("Sector ocupado por otro jugador");
         }
 
         // comprobar distancia con otras colonias
@@ -63,30 +67,39 @@ public class ColoniaService {
         // revelar sectores iniciales
         explorationService.revelarSectoresIniciales(colonia);
     }
+    
+    public boolean validarDistanciaNuevaColonia(int x, int y) {
 
-    private void comprobarDistanciaColonias(int x, int y) {
-
-        List<Colonia> colonias = coloniaRepository.findAll();
+        List<Colonia> colonias = coloniaRepository.findBySectorNaveIsNotNull();
 
         for (Colonia otra : colonias) {
-
-            if (otra.getSectorNave() == null)
-                continue;
 
             int dx = Math.abs(otra.getSectorNave().getX() - x);
             int dy = Math.abs(otra.getSectorNave().getY() - y);
 
             int distancia = Math.max(dx, dy);
 
-            if (distancia < DISTANCIA_MINIMA) {
-                throw new RuntimeException("Demasiado cerca de otra colonia");
+            if (distancia < GameBalance.MINIMUM_COLONY_DISTANCE) {
+                return false;
             }
+        }
+
+        return true;
+    }
+
+    private void comprobarDistanciaColonias(int x, int y) {
+
+        if (!validarDistanciaNuevaColonia(x, y)) {
+            throw new GameRuleViolationException("Demasiado cerca de otra colonia");
         }
     }
 
     public Colonia obtenerColonia(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El ID de la colonia no puede ser null");
+        }
 
         return coloniaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Colonia no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
     }
 }
