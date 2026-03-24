@@ -64,6 +64,12 @@ public class PersonajeController {
         );
     }
 
+    @PostMapping("/guerreros/{guerreroId}/retirar")
+    public String retirarGuerrero(@PathVariable Long guerreroId) {
+        personajeService.retirarGuerreroANave(guerreroId);
+        return "Guerrero enviado de vuelta a la nave";
+    }
+
     @PostMapping("/{personajeId}/nanocura")
     public Personaje usarNanocura(
             @PathVariable Long personajeId,

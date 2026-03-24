@@ -30,6 +30,18 @@ public class GameBalance {
         public static final double PROB_POR_DESTREZA = 0.04;
         public static final int SAQUEO_NAVE_PORCENTAJE = 20;
         public static final int SAQUEO_EDIFICIO_PORCENTAJE = 6;
+        public static final int CAPACIDAD_BATERIA = 100;
+        public static final int REDESPLIEGUE_COSTE_BASE = 50;
+        public static final int REDESPLIEGUE_COSTE_POR_DISTANCIA = 5;
+        public static final int DEFENSA_COSTE_ESCUDO = 3;
+        public static final int DEFENSA_COSTE_TORRETA = 2;
+        public static final int DEFENSA_COSTE_CANON = 4;
+
+        public static final int GENERADOR_NEON_ENERGIA_POR_NEOCROMO = 3;
+        public static final int GENERADOR_NEON_ENERGIA_POR_UMBRIUM = 5;
+        public static final int GENERADOR_NEON_ENERGIA_POR_SYNTHERIUM = 8;
+        public static final int GENERADOR_NEON_ENERGIA_POR_HEXALIUM = 12;
+        public static final int GENERADOR_NEON_ENERGIA_POR_VOIDIUM = 16;
 
     private static final Map<TipoEdificio, Map<ResourceType, Integer>> COSTES_BASE = new EnumMap<>(TipoEdificio.class);
     private static final Map<TipoEdificio, Integer> PRODUCCION_BASE = new EnumMap<>(TipoEdificio.class);
@@ -164,7 +176,7 @@ public class GameBalance {
                 ResourceType.VOIDIUM, 150
         ));
 
-        PRODUCCION_BASE.put(TipoEdificio.PLACA_SOLAR, 8);
+        PRODUCCION_BASE.put(TipoEdificio.PLACA_SOLAR, 12);
         PRODUCCION_BASE.put(TipoEdificio.GENERADOR_NEON, 15);
         PRODUCCION_BASE.put(TipoEdificio.REACTOR_FUSION, 32);
 
@@ -173,6 +185,22 @@ public class GameBalance {
         COSTES_BASE.put(TipoEdificio.BATERIA_ENERGIA, Map.of(
                 ResourceType.NEOCROMO, 120,
                 ResourceType.UMBRIUM, 60
+        ));
+
+        COSTES_BASE.put(TipoEdificio.ESCUDO_SECTOR, Map.of(
+                ResourceType.NEOCROMO, 160,
+                ResourceType.UMBRIUM, 80
+        ));
+
+        COSTES_BASE.put(TipoEdificio.TORRETA_NEOCROMO, Map.of(
+                ResourceType.NEOCROMO, 180,
+                ResourceType.HEXALIUM, 60
+        ));
+
+        COSTES_BASE.put(TipoEdificio.CANON_HEXALIUM, Map.of(
+                ResourceType.NEOCROMO, 220,
+                ResourceType.HEXALIUM, 120,
+                ResourceType.SYNTHERIUM, 80
         ));
 
         // ===== TIEMPOS =====
@@ -198,6 +226,10 @@ public class GameBalance {
         TIEMPO_BASE.put(TipoEdificio.REACTOR_FUSION, 540);
 
         TIEMPO_BASE.put(TipoEdificio.BATERIA_ENERGIA, 120);
+
+                TIEMPO_BASE.put(TipoEdificio.ESCUDO_SECTOR, 180);
+                TIEMPO_BASE.put(TipoEdificio.TORRETA_NEOCROMO, 210);
+                TIEMPO_BASE.put(TipoEdificio.CANON_HEXALIUM, 300);
     }
 
     public static Map<ResourceType, Integer> getCosteBase(TipoEdificio tipo) {

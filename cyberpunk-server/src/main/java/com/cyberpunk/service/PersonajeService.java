@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cyberpunk.domain.colonia.Colonia;
+import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.personaje.Guerrero;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
@@ -19,6 +20,7 @@ import com.cyberpunk.gameBalance.GameBalance;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.PersonajeRepository;
 import com.cyberpunk.util.SkillValidator;
+import com.cyberpunk.util.TravelCalculator;
 
 @Service
 public class PersonajeService {
@@ -214,6 +216,42 @@ public class PersonajeService {
         personajeRepository.save(personaje);
         coloniaRepository.save(colonia);
         return personaje;
+    }
+
+    @Transactional
+    public void retirarGuerreroANave(Long guerreroId) {
+        if (guerreroId == null) {
+            throw new IllegalArgumentException("El ID del guerrero no puede ser null");
+        }
+
+        Personaje personaje = personajeRepository.findById(guerreroId)
+                .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
+
+        if (!(personaje instanceof Guerrero guerrero)) {
+            throw new GameRuleViolationException("El personaje indicado no es un guerrero");
+        }
+
+        Colonia colonia = guerrero.getColonia();
+        if (colonia == null || colonia.getSectorNave() == null) {
+            throw new GameRuleViolationException("El guerrero no pertenece a una colonia con nave desplegada");
+        }
+
+        if (guerrero.estaEnViaje()) {
+            throw new GameRuleViolationException("No puedes retirar a un guerrero mientras está viajando");
+        }
+
+        if (guerrero.getSectorAsignado() == null && guerrero.getMisionPendiente() == null) {
+            throw new GameRuleViolationException("El guerrero ya está disponible en la nave");
+        }
+
+        MapSector origen = guerrero.getSectorActual();
+        guerrero.setMisionPendiente(null);
+        guerrero.setSectorMision(null);
+        guerrero.setTicksVueltaMision(0);
+        guerrero.forzarReposo();
+        guerrero.iniciarViaje(origen, TravelCalculator.calcularTicks(origen, colonia.getSectorNave()));
+
+        personajeRepository.save(guerrero);
     }
 
     private Colonia obtenerColonia(Long coloniaId) {

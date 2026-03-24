@@ -55,8 +55,9 @@ public class ExplorationService {
                         existing -> {
                             if (!existing.isVisible()) {
                                 existing.setVisible(true);
-                                explorationRepository.save(existing);
                             }
+                            existing.setIntelNivel(Math.max(existing.getIntelNivel(), SectorExploration.INTEL_COMPLETO));
+                            explorationRepository.save(existing);
                         },
                         () -> explorationRepository.save(new SectorExploration(usuario, sector))
                 );
@@ -106,8 +107,9 @@ public class ExplorationService {
                         existing -> {
                             if (!existing.isVisible()) {
                                 existing.setVisible(true);
-                                explorationRepository.save(existing);
                             }
+                            existing.setIntelNivel(Math.max(existing.getIntelNivel(), SectorExploration.INTEL_COMPLETO));
+                            explorationRepository.save(existing);
                         },
                         () -> {
                             explorationRepository.save(
@@ -120,6 +122,10 @@ public class ExplorationService {
     }
 
     public void marcarSectorVisible(Usuario usuario, MapSector sector) {
+        marcarSectorVisibleConIntel(usuario, sector, SectorExploration.INTEL_COMPLETO);
+    }
+
+    public void marcarSectorVisibleConIntel(Usuario usuario, MapSector sector, int intelNivel) {
         if (usuario == null || sector == null) {
             return;
         }
@@ -131,9 +137,14 @@ public class ExplorationService {
                             if (!existing.isVisible()) {
                                 existing.setVisible(true);
                             }
+                            existing.setIntelNivel(Math.max(existing.getIntelNivel(), intelNivel));
                             explorationRepository.save(existing);
                         },
-                        () -> explorationRepository.save(new SectorExploration(usuario, sector))
+                        () -> {
+                            SectorExploration exploration = new SectorExploration(usuario, sector);
+                            exploration.setIntelNivel(intelNivel);
+                            explorationRepository.save(exploration);
+                        }
                 );
     }
 
@@ -162,6 +173,7 @@ public class ExplorationService {
                         .orElseGet(() -> new SectorExploration(usuario, sector));
 
                 exploration.setVisible(true);
+                exploration.setIntelNivel(Math.max(exploration.getIntelNivel(), SectorExploration.INTEL_COMPLETO));
                 explorationRepository.save(exploration);
             }
         }

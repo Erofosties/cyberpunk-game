@@ -3,6 +3,8 @@ package com.cyberpunk.domain.recursos;
 import java.util.EnumMap;
 import java.util.Map;
 
+import com.cyberpunk.gameBalance.GameBalance;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -213,7 +215,40 @@ public class Recursos {
     }
 
     public void setEnergiaAcumulada(int energiaAcumulada) {
-        this.energiaAcumulada = energiaAcumulada;
+        this.energiaAcumulada = Math.max(0, energiaAcumulada);
+    }
+
+    public int consumirCombustibleGeneradorNeon(int energiaObjetivo) {
+        if (energiaObjetivo <= 0) {
+            return 0;
+        }
+
+        int energiaGenerada = 0;
+        energiaGenerada += consumirCombustible(ResourceType.VOIDIUM, GameBalance.GENERADOR_NEON_ENERGIA_POR_VOIDIUM, energiaObjetivo - energiaGenerada);
+        energiaGenerada += consumirCombustible(ResourceType.HEXALIUM, GameBalance.GENERADOR_NEON_ENERGIA_POR_HEXALIUM, energiaObjetivo - energiaGenerada);
+        energiaGenerada += consumirCombustible(ResourceType.SYNTHERIUM, GameBalance.GENERADOR_NEON_ENERGIA_POR_SYNTHERIUM, energiaObjetivo - energiaGenerada);
+        energiaGenerada += consumirCombustible(ResourceType.UMBRIUM, GameBalance.GENERADOR_NEON_ENERGIA_POR_UMBRIUM, energiaObjetivo - energiaGenerada);
+        energiaGenerada += consumirCombustible(ResourceType.NEOCROMO, GameBalance.GENERADOR_NEON_ENERGIA_POR_NEOCROMO, energiaObjetivo - energiaGenerada);
+
+        return energiaGenerada;
+    }
+
+    private int consumirCombustible(ResourceType tipo, int energiaPorUnidad, int energiaRestante) {
+        if (energiaRestante <= 0 || energiaPorUnidad <= 0) {
+            return 0;
+        }
+
+        int disponible = getCantidad(tipo);
+        if (disponible <= 0) {
+            return 0;
+        }
+
+        int unidadesNecesarias = (int) Math.ceil((double) energiaRestante / energiaPorUnidad);
+        int unidadesConsumidas = Math.min(disponible, unidadesNecesarias);
+
+        consumir(tipo, unidadesConsumidas);
+
+        return unidadesConsumidas * energiaPorUnidad;
     }
 
     // ================= ENUM =================

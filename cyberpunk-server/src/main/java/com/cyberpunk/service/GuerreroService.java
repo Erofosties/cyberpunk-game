@@ -12,11 +12,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cyberpunk.domain.colonia.Colonia;
+import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.domain.map.MapSector;
+import com.cyberpunk.domain.map.SectorExploration;
 import com.cyberpunk.domain.personaje.Guerrero;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
+import com.cyberpunk.dto.DefensasIntelDTO;
+import com.cyberpunk.dto.GuerreroIntelDTO;
 import com.cyberpunk.dto.ReconocimientoSectorDTO;
 import com.cyberpunk.dto.ResultadoAccionGuerrerosDTO;
 import com.cyberpunk.dto.RondaBatallaDTO;
@@ -66,11 +70,13 @@ public class GuerreroService {
                 .orElseThrow(() -> new EntityNotFoundException("Colonia atacante no encontrada"));
 
         List<Guerrero> guerreros = obtenerGuerrerosSeleccionados(coloniaAtacante, guerreroIds);
+        var sectorExistente = mapSectorRepository.findByXAndY(x, y);
+        boolean explorado = sectorExistente
+                .map(sector -> sectorExplorationRepository.existsByUsuarioIdAndSectorId(usuarioId, sector.getId()))
+                .orElse(false);
         MapSector sectorDestino = mapService.getOrGenerateSector(x, y);
         int tiempoIda = calcularTiempoIda(guerreros, sectorDestino);
         int tiempoVuelta = calcularTiempoVuelta(coloniaAtacante, sectorDestino);
-
-        boolean explorado = sectorExplorationRepository.existsByUsuarioIdAndSectorId(usuarioId, sectorDestino.getId());
 
         if (!explorado) {
             programarMision(guerreros, sectorDestino, tiempoIda, tiempoVuelta, "RECON");
@@ -161,48 +167,102 @@ public class GuerreroService {
 
         int penalizacion = 0;
         Colonia coloniaDefensora = obtenerColoniaDefensora(sectorDestino);
-        if (coloniaDefensora != null) {
-            penalizacion = coloniaDefensora.getDefensas().getPenalizacionExploracion();
+        if (coloniaDefensora != null && defensasEnergizadas(coloniaDefensora, sectorDestino)) {
+            penalizacion = getPenalizacionExploracion(coloniaDefensora, sectorDestino);
         }
 
         int puntuacion = Math.max(0, hackeoTotal + guerreros.size() + tirada - penalizacion);
+        int intelNivel = calcularIntelNivel(puntuacion);
 
         ReconocimientoSectorDTO intel = new ReconocimientoSectorDTO();
         intel.setX(sectorDestino.getX());
         intel.setY(sectorDestino.getY());
 
-        if (puntuacion >= 2) {
-            intel.setTerrain(sectorDestino.getTerrain().name());
+        intel.setTerrain(sectorDestino.getTerrain().name());
+        intel.setResource(sectorDestino.getResource().name());
+        intel.setRichness(sectorDestino.getRichness());
+        intel.setOwnerId(sectorDestino.getOwner() != null ? sectorDestino.getOwner().getId() : null);
+
+        String building = sectorDestino.getBuilding() != null ? sectorDestino.getBuilding().name() : null;
+        Integer buildingLevel = null;
+
+        if (building == null && coloniaDefensora != null) {
+            building = coloniaDefensora.getColaConstruccion().stream()
+                    .filter(construccion -> construccion.getSectorDestino() != null)
+                    .filter(construccion -> construccion.getSectorDestino().getId() != null)
+                    .filter(construccion -> construccion.getSectorDestino().getId().equals(sectorDestino.getId()))
+                    .map(ConstruccionEnCurso::getTipo)
+                    .findFirst()
+                    .orElse(null);
+
+            if (building != null && intelNivel >= SectorExploration.INTEL_TACTICO) {
+                buildingLevel = 0;
+            }
+        } else if (sectorDestino.getBuilding() != null && intelNivel >= SectorExploration.INTEL_TACTICO) {
+            buildingLevel = sectorDestino.getBuildingLevel();
         }
-        if (puntuacion >= 4) {
-            intel.setResource(sectorDestino.getResource().name());
+
+        intel.setBuilding(building);
+        intel.setBuildingLevel(buildingLevel);
+
+        if (coloniaDefensora != null && intelNivel >= SectorExploration.INTEL_TACTICO) {
+            List<Personaje> defensoresSector = obtenerDefensoresSector(coloniaDefensora, sectorDestino);
+            int cantidadGuerreros = (int) defensoresSector.stream()
+                    .filter(Guerrero.class::isInstance)
+                    .count();
+            int cantidadTrabajadores = (int) defensoresSector.stream()
+                    .filter(Trabajador.class::isInstance)
+                    .count();
+                int cantidadDefensas = contarDefensasSector(coloniaDefensora, sectorDestino);
+
+            intel.setCantidadGuerreros(cantidadGuerreros);
+            intel.setCantidadTrabajadores(cantidadTrabajadores);
+            intel.setCantidadDefensas(cantidadDefensas);
+
+                if (intelNivel >= SectorExploration.INTEL_COMPLETO) {
+                intel.setDefensas(crearDefensasIntel(coloniaDefensora, sectorDestino));
+
+                List<GuerreroIntelDTO> guerrerosDefensores = defensoresSector.stream()
+                        .filter(Guerrero.class::isInstance)
+                        .map(Guerrero.class::cast)
+                        .map(defensor -> new GuerreroIntelDTO(
+                                defensor.getId(),
+                                defensor.getNombre(),
+                                defensor.getFuerza(),
+                                defensor.getDestreza(),
+                                defensor.getResistencia(),
+                                defensor.getHackeo()))
+                        .toList();
+
+                intel.setGuerreros(guerrerosDefensores);
+            }
         }
-        if (puntuacion >= 6) {
-            intel.setRichness(sectorDestino.getRichness());
-            explorationService.marcarSectorVisible(coloniaAtacante.getUsuario(), sectorDestino);
-        }
-        if (puntuacion >= 8 && sectorDestino.getBuilding() != null) {
-            intel.setBuilding(sectorDestino.getBuilding().name());
-            intel.setBuildingLevel(sectorDestino.getBuildingLevel());
-        }
-        if (puntuacion >= 10) {
-            intel.setOwnerId(sectorDestino.getOwner() != null ? sectorDestino.getOwner().getId() : null);
-            intel.setOcupado(coloniaDefensora != null);
-            intel.setDefensoresDetectados(coloniaDefensora != null ? contarDefensoresSector(coloniaDefensora, sectorDestino) : 0);
-            intel.setNivelCupulas(coloniaDefensora != null ? coloniaDefensora.getDefensas().getEscudos() : 0);
-        }
+
+        explorationService.marcarSectorVisibleConIntel(coloniaAtacante.getUsuario(), sectorDestino, intelNivel);
 
         ResultadoAccionGuerrerosDTO resultado = new ResultadoAccionGuerrerosDTO();
         resultado.setAccion("RECON");
-        resultado.setResultado(puntuacion >= 6 ? "OK" : "PARCIAL");
-        resultado.setMensaje(puntuacion >= 6
-                ? "Los guerreros han devuelto información útil del sector"
-                : "El reconocimiento fue interferido; la información es parcial");
+        resultado.setResultado(puntuacion >= 8 ? "OK" : "PARCIAL");
+        resultado.setMensaje(puntuacion >= 10
+                ? "Reconocimiento excelente: datos tácticos completos obtenidos"
+                : puntuacion >= 7
+                ? "Reconocimiento correcto: se obtuvo inteligencia táctica parcial"
+                : "Reconocimiento básico: solo se obtuvo información estructural del sector");
         resultado.setGuerrerosEnviados(guerreros.size());
         resultado.setGuerrerosOperativos(contarOperativos(guerreros));
         resultado.setDefensoresOperativos(0);
         resultado.setReconocimiento(intel);
         return resultado;
+    }
+
+    private int calcularIntelNivel(int puntuacion) {
+        if (puntuacion >= 10) {
+            return SectorExploration.INTEL_COMPLETO;
+        }
+        if (puntuacion >= 7) {
+            return SectorExploration.INTEL_TACTICO;
+        }
+        return SectorExploration.INTEL_BASE;
     }
 
     @SuppressWarnings("null")
@@ -217,26 +277,26 @@ public class GuerreroService {
         List<RondaBatallaDTO> informeRondas = new ArrayList<>();
 
         int numeroRonda = 0;
-        while (contarOperativos(atacantes) > 0 && hayDefensaOperativa(coloniaDefensora, defensores) && numeroRonda < 12) {
+        while (contarOperativos(atacantes) > 0 && hayDefensaOperativa(coloniaDefensora, sectorDestino, defensores) && numeroRonda < 12) {
             RondaBatallaDTO ronda = new RondaBatallaDTO();
             ronda.setRonda(numeroRonda + 1);
 
-            aplicarDanioDefensas(coloniaDefensora, atacantes, objetivoEsNave);
-            int danioDefensas = ejecutarTurnoAtaque(atacantes, defensores, coloniaDefensora);
-            ejecutarTurnoDefensa(defensores, atacantes, coloniaDefensora);
+            aplicarDanioDefensas(coloniaDefensora, sectorDestino, atacantes, objetivoEsNave);
+            int danioDefensas = ejecutarTurnoAtaque(atacantes, defensores, coloniaDefensora, sectorDestino);
+            ejecutarTurnoDefensa(defensores, atacantes, coloniaDefensora, sectorDestino);
 
             ronda.setAtacantesOperativos(contarOperativos(atacantes));
             ronda.setDefensoresOperativos(contarGuerrerosDefensoresOperativos(defensores));
             ronda.setTrabajadoresDefensoresOperativos(contarTrabajadoresDefensoresOperativos(defensores));
             ronda.setDanioDefensas(danioDefensas);
-            ronda.setDefensasDestruidas(!coloniaDefensora.getDefensas().defensasActivas());
+            ronda.setDefensasDestruidas(!defensasActivasEnSector(coloniaDefensora, sectorDestino));
             ronda.setResumen(crearResumenRonda(ronda));
             informeRondas.add(ronda);
 
             numeroRonda++;
         }
 
-        boolean victoria = contarOperativos(atacantes) > 0 && !hayDefensaOperativa(coloniaDefensora, defensores);
+        boolean victoria = contarOperativos(atacantes) > 0 && !hayDefensaOperativa(coloniaDefensora, sectorDestino, defensores);
         Map<String, Integer> botin = new HashMap<>();
 
         if (victoria) {
@@ -268,8 +328,12 @@ public class GuerreroService {
         return resultado;
     }
 
-    private void aplicarDanioDefensas(Colonia coloniaDefensora, List<Guerrero> atacantes, boolean objetivoEsNave) {
-        int danio = coloniaDefensora.getDefensas().calcularDanioConstanteAtaque(objetivoEsNave);
+    private void aplicarDanioDefensas(Colonia coloniaDefensora, MapSector sectorDestino, List<Guerrero> atacantes, boolean objetivoEsNave) {
+        if (!defensasEnergizadas(coloniaDefensora, sectorDestino)) {
+            return;
+        }
+
+        int danio = calcularDanioDefensas(coloniaDefensora, sectorDestino, objetivoEsNave);
         List<Guerrero> vivos = atacantes.stream().filter(Personaje::puedeActuar).collect(Collectors.toList());
         if (danio <= 0 || vivos.isEmpty()) {
             return;
@@ -281,12 +345,12 @@ public class GuerreroService {
         }
     }
 
-    private int ejecutarTurnoAtaque(List<Guerrero> atacantes, List<Personaje> defensores, Colonia coloniaDefensora) {
-        List<Personaje> objetivos = seleccionarObjetivosParaAtacantes(defensores, coloniaDefensora);
+    private int ejecutarTurnoAtaque(List<Guerrero> atacantes, List<Personaje> defensores, Colonia coloniaDefensora, MapSector sectorDestino) {
+        List<Personaje> objetivos = seleccionarObjetivosParaAtacantes(defensores, coloniaDefensora, sectorDestino);
         if (objetivos.isEmpty()) {
             int fuerzaTotal = atacantes.stream().filter(Personaje::puedeActuar).mapToInt(Guerrero::getFuerza).sum();
-            if (coloniaDefensora.getDefensas().defensasActivas() && fuerzaTotal > 0) {
-                coloniaDefensora.getDefensas().recibirAtaqueEnSector(fuerzaTotal);
+            if (defensasActivasEnSector(coloniaDefensora, sectorDestino) && defensasEnergizadas(coloniaDefensora, sectorDestino) && fuerzaTotal > 0) {
+                recibirAtaqueDefensas(coloniaDefensora, sectorDestino, fuerzaTotal);
                 return fuerzaTotal;
             }
             return 0;
@@ -297,7 +361,7 @@ public class GuerreroService {
                 continue;
             }
 
-            objetivos = seleccionarObjetivosParaAtacantes(defensores, coloniaDefensora);
+            objetivos = seleccionarObjetivosParaAtacantes(defensores, coloniaDefensora, sectorDestino);
             if (objetivos.isEmpty()) {
                 break;
             }
@@ -309,7 +373,7 @@ public class GuerreroService {
         return 0;
     }
 
-    private void ejecutarTurnoDefensa(List<Personaje> defensores, List<Guerrero> atacantes, Colonia coloniaDefensora) {
+    private void ejecutarTurnoDefensa(List<Personaje> defensores, List<Guerrero> atacantes, Colonia coloniaDefensora, MapSector sectorDestino) {
         List<Guerrero> guerrerosDefensores = defensores.stream()
                 .filter(Personaje::puedeActuar)
                 .filter(personaje -> personaje instanceof Guerrero)
@@ -323,7 +387,7 @@ public class GuerreroService {
             return;
         }
 
-        if (coloniaDefensora.getDefensas().defensasActivas()) {
+        if (defensasActivasEnSector(coloniaDefensora, sectorDestino) && defensasEnergizadas(coloniaDefensora, sectorDestino)) {
             return;
         }
 
@@ -510,6 +574,89 @@ public class GuerreroService {
         return coloniaRepository.findByUsuarioId(sectorDestino.getOwner().getId()).orElse(null);
     }
 
+    private boolean esSectorNave(Colonia colonia, MapSector sector) {
+        if (colonia == null) {
+            return false;
+        }
+
+        MapSector sectorNave = colonia.getSectorNave();
+        if (sectorNave == null || sector == null) {
+            return false;
+        }
+
+        if (sectorNave.getId() != null && sector.getId() != null) {
+            return sectorNave.getId().equals(sector.getId());
+        }
+
+        return sectorNave.getX() == sector.getX() && sectorNave.getY() == sector.getY();
+    }
+
+    private int contarDefensas(Colonia colonia) {
+        return colonia.getDefensas().getEscudos()
+                + colonia.getDefensas().getTorretasNeocromo()
+                + colonia.getDefensas().getCanonesHexalium();
+    }
+
+    private int contarDefensasSector(Colonia colonia, MapSector sector) {
+        if (esSectorNave(colonia, sector)) {
+            return contarDefensas(colonia);
+        }
+
+        return sector.getCantidadDefensasSector();
+    }
+
+    private DefensasIntelDTO crearDefensasIntel(Colonia colonia, MapSector sector) {
+        if (esSectorNave(colonia, sector)) {
+            return new DefensasIntelDTO(
+                    colonia.getDefensas().getEscudos(),
+                    colonia.getDefensas().getTorretasNeocromo(),
+                    colonia.getDefensas().getCanonesHexalium());
+        }
+
+        if (!sector.tieneDefensaSectorial()) {
+            return null;
+        }
+
+        return new DefensasIntelDTO(
+                sector.getCantidadEscudosSector(),
+                sector.getCantidadTorretasSector(),
+                sector.getCantidadCanonesSector());
+    }
+
+    private int getPenalizacionExploracion(Colonia colonia, MapSector sector) {
+        if (esSectorNave(colonia, sector)) {
+            return colonia.getDefensas().getPenalizacionExploracion();
+        }
+
+        return sector.getPenalizacionExploracionSector();
+    }
+
+    private int calcularDanioDefensas(Colonia colonia, MapSector sector, boolean objetivoEsNave) {
+        if (esSectorNave(colonia, sector)) {
+            return colonia.getDefensas().calcularDanioConstanteAtaque(objetivoEsNave);
+        }
+
+        return sector.calcularDanioConstanteDefensaSector();
+    }
+
+    private void recibirAtaqueDefensas(Colonia colonia, MapSector sector, int fuerzaTotal) {
+        if (esSectorNave(colonia, sector)) {
+            colonia.getDefensas().recibirAtaqueEnSector(fuerzaTotal);
+            return;
+        }
+
+        sector.recibirAtaqueDefensaSector(fuerzaTotal);
+        mapSectorRepository.save(sector);
+    }
+
+    private boolean defensasActivasEnSector(Colonia colonia, MapSector sector) {
+        if (esSectorNave(colonia, sector)) {
+            return colonia.getDefensas().defensasActivas();
+        }
+
+        return sector.defensasActivasSector();
+    }
+
     private List<Personaje> obtenerDefensoresSector(Colonia coloniaDefensora, MapSector sectorDestino) {
         return coloniaDefensora.getPoblacion().stream()
                 .filter(Personaje::puedeActuar)
@@ -520,17 +667,16 @@ public class GuerreroService {
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    private int contarDefensoresSector(Colonia coloniaDefensora, MapSector sectorDestino) {
-        return obtenerDefensoresSector(coloniaDefensora, sectorDestino).size();
-    }
+    private boolean hayDefensaOperativa(Colonia coloniaDefensora, MapSector sectorDestino, List<Personaje> defensores) {
+        boolean defensasActivasConEnergia = defensasActivasEnSector(coloniaDefensora, sectorDestino)
+            && defensasEnergizadas(coloniaDefensora, sectorDestino);
 
-    private boolean hayDefensaOperativa(Colonia coloniaDefensora, List<Personaje> defensores) {
         return contarGuerrerosDefensoresOperativos(defensores) > 0
-                || (!coloniaDefensora.getDefensas().defensasActivas() && contarTrabajadoresDefensoresOperativos(defensores) > 0)
-                || coloniaDefensora.getDefensas().defensasActivas();
+            || (!defensasActivasConEnergia && contarTrabajadoresDefensoresOperativos(defensores) > 0)
+            || defensasActivasConEnergia;
     }
 
-    private List<Personaje> seleccionarObjetivosParaAtacantes(List<Personaje> defensores, Colonia coloniaDefensora) {
+    private List<Personaje> seleccionarObjetivosParaAtacantes(List<Personaje> defensores, Colonia coloniaDefensora, MapSector sectorDestino) {
         List<Personaje> guerreros = defensores.stream()
                 .filter(Personaje::puedeActuar)
                 .filter(personaje -> personaje instanceof Guerrero)
@@ -540,7 +686,7 @@ public class GuerreroService {
             return guerreros;
         }
 
-        if (coloniaDefensora.getDefensas().defensasActivas()) {
+        if (defensasActivasEnSector(coloniaDefensora, sectorDestino) && defensasEnergizadas(coloniaDefensora, sectorDestino)) {
             return List.of();
         }
 
@@ -586,5 +732,10 @@ public class GuerreroService {
 
     private int contarOperativos(List<? extends Personaje> personajes) {
         return (int) personajes.stream().filter(Personaje::puedeActuar).count();
+    }
+
+    private boolean defensasEnergizadas(Colonia coloniaDefensora, MapSector sectorDestino) {
+        return contarDefensasSector(coloniaDefensora, sectorDestino) > 0
+                && coloniaDefensora.getRecursos().getEnergiaDisponible() >= 0;
     }
 }

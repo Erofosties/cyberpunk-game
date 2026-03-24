@@ -1,5 +1,7 @@
 package com.cyberpunk.dto;
 
+import java.util.List;
+
 public class ReconocimientoSectorDTO {
 
     private int x;
@@ -10,9 +12,11 @@ public class ReconocimientoSectorDTO {
     private String building;
     private Integer buildingLevel;
     private Long ownerId;
-    private Boolean ocupado;
-    private Integer defensoresDetectados;
-    private Integer nivelCupulas;
+    private Integer cantidadGuerreros;
+    private Integer cantidadTrabajadores;
+    private Integer cantidadDefensas;
+    private DefensasIntelDTO defensas;
+    private List<GuerreroIntelDTO> guerreros;
 
     public int getX() { return x; }
     public void setX(int x) { this.x = x; }
@@ -38,12 +42,18 @@ public class ReconocimientoSectorDTO {
     public Long getOwnerId() { return ownerId; }
     public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
 
-    public Boolean getOcupado() { return ocupado; }
-    public void setOcupado(Boolean ocupado) { this.ocupado = ocupado; }
+    public Integer getCantidadGuerreros() { return cantidadGuerreros; }
+    public void setCantidadGuerreros(Integer cantidadGuerreros) { this.cantidadGuerreros = cantidadGuerreros; }
 
-    public Integer getDefensoresDetectados() { return defensoresDetectados; }
-    public void setDefensoresDetectados(Integer defensoresDetectados) { this.defensoresDetectados = defensoresDetectados; }
+    public Integer getCantidadTrabajadores() { return cantidadTrabajadores; }
+    public void setCantidadTrabajadores(Integer cantidadTrabajadores) { this.cantidadTrabajadores = cantidadTrabajadores; }
 
-    public Integer getNivelCupulas() { return nivelCupulas; }
-    public void setNivelCupulas(Integer nivelCupulas) { this.nivelCupulas = nivelCupulas; }
+    public Integer getCantidadDefensas() { return cantidadDefensas; }
+    public void setCantidadDefensas(Integer cantidadDefensas) { this.cantidadDefensas = cantidadDefensas; }
+
+    public DefensasIntelDTO getDefensas() { return defensas; }
+    public void setDefensas(DefensasIntelDTO defensas) { this.defensas = defensas; }
+
+    public List<GuerreroIntelDTO> getGuerreros() { return guerreros; }
+    public void setGuerreros(List<GuerreroIntelDTO> guerreros) { this.guerreros = guerreros; }
 }

@@ -14,6 +14,7 @@ import com.cyberpunk.domain.colonia.ConstruccionEnCurso;
 import com.cyberpunk.dto.AsignarConstruccionRequest;
 import com.cyberpunk.dto.AsignarSectorTrabajoRequest;
 import com.cyberpunk.dto.ConstruirEdificioRequest;
+import com.cyberpunk.dto.EstadoGeneradorNeonRequest;
 import com.cyberpunk.service.EdificioService;
 
 import jakarta.validation.Valid;
@@ -69,6 +70,25 @@ public class EdificioController {
         );
 
         return ResponseEntity.ok("Trabajador asignado a sector");
+    }
+
+    @PostMapping("/desasignar-trabajo/{personajeId}")
+    public ResponseEntity<String> desasignarTrabajo(@PathVariable Long personajeId) {
+        edificioService.desasignarTrabajador(personajeId);
+        return ResponseEntity.ok("Trabajador enviado de vuelta a la nave");
+    }
+
+    @PostMapping("/generador-neon/estado")
+    public ResponseEntity<String> cambiarEstadoGeneradorNeon(
+            @Valid @RequestBody EstadoGeneradorNeonRequest request) {
+
+        edificioService.cambiarEstadoGeneradorNeon(
+                request.getColoniaId(),
+                request.getSectorId(),
+                request.getActivo()
+        );
+
+        return ResponseEntity.ok("Estado del generador neon actualizado");
     }
 
     // ================= VER CONSTRUCCIONES =================

@@ -3,6 +3,7 @@ package com.cyberpunk.service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -16,7 +17,15 @@ import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.map.MapSector.SectorResource;
 import com.cyberpunk.domain.map.MapSector.TerrainType;
 import com.cyberpunk.domain.map.SectorExploration;
+import com.cyberpunk.domain.personaje.Guerrero;
+import com.cyberpunk.domain.personaje.Personaje;
+import com.cyberpunk.domain.personaje.Trabajador;
+import com.cyberpunk.dto.DefensasIntelDTO;
+import com.cyberpunk.dto.GuerreroIntelDTO;
 import com.cyberpunk.dto.MapSectorDTO;
+import com.cyberpunk.dto.PersonajeSectorDTO;
+import com.cyberpunk.dto.SectorDetalleDTO;
+import com.cyberpunk.exception.GameRuleViolationException;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.MapSectorRepository;
 import com.cyberpunk.repository.SectorExplorationRepository;
@@ -53,6 +62,191 @@ public class MapService {
                 }
             });
     }
+
+    public MapSector getSectorExplorado(Long usuarioId, int x, int y) {
+        if (usuarioId == null) {
+            throw new IllegalArgumentException("El usuarioId no puede ser null");
+        }
+
+        MapSector sector = mapSectorRepository.findByXAndY(x, y)
+                .orElseThrow(() -> new GameRuleViolationException("El sector no ha sido explorado por el jugador"));
+
+        boolean explorado = sectorExplorationRepository.existsByUsuarioIdAndSectorId(usuarioId, sector.getId());
+        if (!explorado) {
+            throw new GameRuleViolationException("El sector no ha sido explorado por el jugador");
+        }
+
+        return sector;
+    }
+
+    public SectorDetalleDTO getSectorDetalle(Long usuarioId, int x, int y) {
+        MapSector sector = getSectorExplorado(usuarioId, x, y);
+        Optional<Colonia> coloniaPropietariaOpt = sector.getOwner() == null
+            ? Optional.empty()
+            : coloniaRepository.findByUsuarioId(sector.getOwner().getId());
+
+        boolean esPropio = sector.getOwner() != null && sector.getOwner().getId().equals(usuarioId);
+        int intelNivel = resolverIntelNivel(usuarioId, sector, esPropio);
+
+        String building = sector.getBuilding() != null ? sector.getBuilding().name() : null;
+        Integer buildingLevel = (sector.getBuilding() != null && intelNivel >= SectorExploration.INTEL_TACTICO)
+            ? sector.getBuildingLevel()
+            : null;
+
+        List<PersonajeSectorDTO> trabajadores = List.of();
+        List<GuerreroIntelDTO> guerreros = List.of();
+        Integer cantidadTrabajadores = null;
+        Integer cantidadGuerreros = null;
+        Integer cantidadDefensas = null;
+        DefensasIntelDTO defensas = null;
+
+        if (coloniaPropietariaOpt.isPresent()) {
+            Colonia coloniaPropietaria = coloniaPropietariaOpt.get();
+            boolean esSectorNave = esSectorNave(coloniaPropietaria, sector);
+
+            if (building == null) {
+            Optional<ConstruccionEnCurso> construccionEnSector = coloniaPropietaria.getColaConstruccion().stream()
+                .filter(c -> c.getSectorDestino() != null)
+                .filter(c -> c.getSectorDestino().getId() != null)
+                .filter(c -> c.getSectorDestino().getId().equals(sector.getId()))
+                .findFirst();
+
+            if (construccionEnSector.isPresent()) {
+                building = construccionEnSector.get().getTipo();
+                buildingLevel = intelNivel >= SectorExploration.INTEL_TACTICO ? 0 : null;
+            }
+            }
+
+            List<Trabajador> trabajadoresSector = coloniaPropietaria.getPoblacion().stream()
+                    .filter(personaje -> personajeAsignadoOEnSector(personaje, sector, coloniaPropietaria))
+                    .filter(Trabajador.class::isInstance)
+                .map(Trabajador.class::cast)
+                    .toList();
+
+            List<Guerrero> guerrerosSector = coloniaPropietaria.getPoblacion().stream()
+                    .filter(personaje -> personajeAsignadoOEnSector(personaje, sector, coloniaPropietaria))
+                    .filter(Guerrero.class::isInstance)
+                .map(Guerrero.class::cast)
+                    .toList();
+
+            if (esPropio || intelNivel >= SectorExploration.INTEL_TACTICO) {
+            cantidadTrabajadores = trabajadoresSector.size();
+            cantidadGuerreros = guerrerosSector.size();
+            cantidadDefensas = contarDefensasSector(coloniaPropietaria, sector, esSectorNave);
+            }
+
+            if (esPropio || intelNivel >= SectorExploration.INTEL_COMPLETO) {
+            defensas = construirDefensasIntel(coloniaPropietaria, sector, esSectorNave);
+
+            trabajadores = trabajadoresSector.stream()
+                .map(trabajador -> new PersonajeSectorDTO(trabajador.getId(), trabajador.getNombre()))
+                .toList();
+
+            guerreros = guerrerosSector.stream()
+                .map(guerrero -> new GuerreroIntelDTO(
+                    guerrero.getId(),
+                    guerrero.getNombre(),
+                    guerrero.getFuerza(),
+                    guerrero.getDestreza(),
+                    guerrero.getResistencia(),
+                    guerrero.getHackeo()))
+                .toList();
+            }
+        }
+
+        return new SectorDetalleDTO(
+                sector.getId(),
+                sector.getX(),
+                sector.getY(),
+                sector.getTerrain().name(),
+                sector.getResource().name(),
+                sector.getRichness(),
+                building,
+                buildingLevel,
+                sector.getOwner() != null ? sector.getOwner().getId() : null,
+            cantidadTrabajadores,
+            cantidadGuerreros,
+            cantidadDefensas,
+            defensas,
+                trabajadores,
+                guerreros);
+    }
+
+        private int resolverIntelNivel(Long usuarioId, MapSector sector, boolean esPropio) {
+        if (esPropio || sector.getOwner() == null) {
+            return SectorExploration.INTEL_COMPLETO;
+        }
+
+        return sectorExplorationRepository.findByUsuarioIdAndSectorId(usuarioId, sector.getId())
+            .map(exploracion -> Math.max(SectorExploration.INTEL_BASE, exploracion.getIntelNivel()))
+            .orElse(SectorExploration.INTEL_BASE);
+        }
+
+    private boolean personajeAsignadoOEnSector(Personaje personaje, MapSector sector, Colonia colonia) {
+        if (personaje == null || sector == null) {
+            return false;
+        }
+
+        MapSector sectorAsignado = personaje.getSectorAsignado();
+        if (sectorAsignado != null) {
+            return mismoSector(sectorAsignado, sector);
+        }
+
+        if (!esSectorNave(colonia, sector) || personaje.estaEnViaje()) {
+            return false;
+        }
+
+        return mismoSector(personaje.getSectorActual(), sector);
+    }
+
+    private boolean esSectorNave(Colonia colonia, MapSector sector) {
+        return colonia != null && mismoSector(colonia.getSectorNave(), sector);
+    }
+
+    private int contarDefensas(Colonia colonia) {
+        return colonia.getDefensas().getEscudos()
+            + colonia.getDefensas().getTorretasNeocromo()
+            + colonia.getDefensas().getCanonesHexalium();
+    }
+
+    private int contarDefensasSector(Colonia colonia, MapSector sector, boolean esSectorNave) {
+        if (esSectorNave) {
+            return contarDefensas(colonia);
+        }
+
+        return sector.getCantidadDefensasSector();
+    }
+
+    private DefensasIntelDTO construirDefensasIntel(Colonia colonia, MapSector sector, boolean esSectorNave) {
+        if (esSectorNave) {
+            return new DefensasIntelDTO(
+                colonia.getDefensas().getEscudos(),
+                colonia.getDefensas().getTorretasNeocromo(),
+                colonia.getDefensas().getCanonesHexalium());
+        }
+
+        if (!sector.tieneDefensaSectorial()) {
+            return null;
+        }
+
+        return new DefensasIntelDTO(
+            sector.getCantidadEscudosSector(),
+            sector.getCantidadTorretasSector(),
+            sector.getCantidadCanonesSector());
+    }
+
+    private boolean mismoSector(MapSector primero, MapSector segundo) {
+        if (primero == null || segundo == null) {
+            return false;
+        }
+
+        if (primero.getId() != null && segundo.getId() != null) {
+            return primero.getId().equals(segundo.getId());
+        }
+
+        return primero.getX() == segundo.getX() && primero.getY() == segundo.getY();
+    }
+
     public String getMapaVisibleComoTexto(Long usuarioId) {
 
         List<SectorExploration> exploraciones = sectorExplorationRepository.findByUsuarioId(usuarioId);

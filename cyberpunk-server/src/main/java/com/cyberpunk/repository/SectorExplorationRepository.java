@@ -24,6 +24,8 @@ public interface SectorExplorationRepository extends JpaRepository<SectorExplora
 
     List<SectorExploration> findByUsuarioIdAndVisibleTrue(Long usuarioId);
 
+    Optional<SectorExploration> findByUsuarioIdAndSectorId(Long usuarioId, Long sectorId);
+
     boolean existsByUsuarioAndSector(Usuario usuario, MapSector sector);
     boolean existsByUsuarioIdAndSectorId(Long usuarioId, Long sectorId);
 

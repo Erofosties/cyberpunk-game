@@ -5,10 +5,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 import com.cyberpunk.domain.defensa.Defensas;
+import com.cyberpunk.domain.edificio.Edificio;
 import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.personaje.Personaje;
 import com.cyberpunk.domain.recursos.Recursos;
 import com.cyberpunk.domain.usuario.Usuario;
+import com.cyberpunk.gameBalance.GameBalance;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
@@ -65,12 +67,23 @@ public class Colonia {
     public Colonia() {
         this.recursos = new Recursos();
         this.defensas = new Defensas();
+        inicializarEnergiaBase();
     }
 
     public Colonia(String nombre) {
         this.nombre = nombre;
         this.recursos = new Recursos();
         this.defensas = new Defensas();
+        inicializarEnergiaBase();
+    }
+
+    private void inicializarEnergiaBase() {
+        int energiaInicial = Math.max(0,
+                this.placasSolares * GameBalance.getProduccionBase(Edificio.TipoEdificio.PLACA_SOLAR));
+        int capacidadInicial = Math.max(0, this.baterias) * GameBalance.CAPACIDAD_BATERIA;
+
+        this.recursos.setEnergiaDisponible(energiaInicial);
+        this.recursos.setEnergiaAcumulada(capacidadInicial);
     }
 
     // ================= GETTERS =================

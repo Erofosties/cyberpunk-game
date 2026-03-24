@@ -24,6 +24,10 @@ public class Edificio {
         REACTOR_FUSION,
         GENERADOR_NEON,
 
-        BATERIA_ENERGIA
+        BATERIA_ENERGIA,
+
+        ESCUDO_SECTOR,
+        TORRETA_NEOCROMO,
+        CANON_HEXALIUM
     }
 }

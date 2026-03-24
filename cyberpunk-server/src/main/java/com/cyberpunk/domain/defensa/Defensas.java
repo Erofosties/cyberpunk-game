@@ -30,7 +30,7 @@ public class Defensas {
     private void inicializarDefensas() {
         this.escudos = 1;
         this.torretasNeocromo = 2;
-        this.canonesHexalium = 1;
+        this.canonesHexalium = 0;
         this.integridadNave = 100;
     }
 

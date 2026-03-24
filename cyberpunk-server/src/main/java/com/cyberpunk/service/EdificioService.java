@@ -11,7 +11,9 @@ import com.cyberpunk.domain.edificio.CosteEdificioCalculator;
 import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.map.MapSector.SectorResource;
+import com.cyberpunk.domain.map.MapSector.TerrainType;
 import com.cyberpunk.domain.personaje.Personaje;
+import com.cyberpunk.domain.personaje.Trabajador;
 import com.cyberpunk.domain.recursos.Recursos;
 import com.cyberpunk.domain.recursos.Recursos.ResourceType;
 import com.cyberpunk.exception.EntityNotFoundException;
@@ -139,6 +141,10 @@ public class EdificioService {
         Personaje personaje = personajeRepository.findById(personajeId)
                 .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
 
+        if (!(personaje instanceof Trabajador)) {
+            throw new GameRuleViolationException("Solo los trabajadores pueden ser asignados a una construcción");
+        }
+
         if (!personaje.puedeActuar()) {
             throw new GameRuleViolationException("El personaje está incapacitado y no puede trabajar");
         }
@@ -167,6 +173,10 @@ public class EdificioService {
 
         Personaje personaje = personajeRepository.findById(personajeId)
                 .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
+
+        if (!(personaje instanceof Trabajador)) {
+            throw new GameRuleViolationException("Solo los trabajadores pueden ser asignados a un sector de trabajo");
+        }
 
         if (!personaje.puedeActuar()) {
             throw new GameRuleViolationException("El personaje está incapacitado y no puede trabajar");
@@ -198,6 +208,39 @@ public class EdificioService {
         personajeRepository.save(personaje);
     }
 
+    @Transactional
+    public void desasignarTrabajador(Long personajeId) {
+        if (personajeId == null) {
+            throw new IllegalArgumentException("El ID del personaje no puede ser null");
+        }
+
+        Personaje personaje = personajeRepository.findById(personajeId)
+                .orElseThrow(() -> new EntityNotFoundException("Personaje no encontrado"));
+
+        if (!(personaje instanceof Trabajador)) {
+            throw new GameRuleViolationException("El personaje indicado no es un trabajador");
+        }
+
+        Colonia colonia = personaje.getColonia();
+        if (colonia == null || colonia.getSectorNave() == null) {
+            throw new GameRuleViolationException("El personaje no pertenece a una colonia con nave desplegada");
+        }
+
+        if (personaje.getConstruccionAsignada() == null && personaje.getSectorAsignado() == null && !personaje.estaEnViaje()) {
+            throw new GameRuleViolationException("El trabajador ya está disponible en la nave");
+        }
+
+        if (personaje.estaEnViaje()) {
+            throw new GameRuleViolationException("No puedes desasignar a un trabajador mientras está viajando");
+        }
+
+        MapSector origen = personaje.getSectorActual();
+        personaje.forzarReposo();
+        personaje.iniciarViaje(origen, TravelCalculator.calcularTicks(origen, colonia.getSectorNave()));
+
+        personajeRepository.save(personaje);
+    }
+
     public List<ConstruccionEnCurso> getConstrucciones(Long coloniaId) {
         if (coloniaId == null) {
             throw new IllegalArgumentException("El ID de la colonia no puede ser null");
@@ -205,6 +248,33 @@ public class EdificioService {
         Colonia colonia = coloniaRepository.findById(coloniaId)
                 .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
         return colonia.getColaConstruccion();
+    }
+
+    @Transactional
+    public void cambiarEstadoGeneradorNeon(Long coloniaId, Long sectorId, boolean activo) {
+        if (coloniaId == null) {
+            throw new IllegalArgumentException("El ID de la colonia no puede ser null");
+        }
+        if (sectorId == null) {
+            throw new IllegalArgumentException("El ID del sector no puede ser null");
+        }
+
+        Colonia colonia = coloniaRepository.findById(coloniaId)
+                .orElseThrow(() -> new EntityNotFoundException("Colonia no encontrada"));
+
+        MapSector sector = mapSectorRepository.findById(sectorId)
+                .orElseThrow(() -> new EntityNotFoundException("Sector no encontrado"));
+
+        if (sector.getOwner() == null || !sector.getOwner().getId().equals(colonia.getUsuario().getId())) {
+            throw new GameRuleViolationException("El sector no pertenece a tu colonia");
+        }
+
+        if (sector.getBuilding() != TipoEdificio.GENERADOR_NEON) {
+            throw new GameRuleViolationException("El sector no contiene un generador neon");
+        }
+
+        sector.setGeneradorNeonActivo(activo);
+        mapSectorRepository.save(sector);
     }
 
     private static final Map<TipoEdificio, SectorResource> RECURSO_REQUERIDO = Map.ofEntries(
@@ -224,6 +294,15 @@ public class EdificioService {
     );
 
     private void validarCompatibilidadRecursoEdificio(MapSector sector, TipoEdificio tipo) {
+        if (esInfraestructuraEnergetica(tipo) && sector.getTerrain() != TerrainType.DESIERTO) {
+            throw new GameRuleViolationException(
+                    "La infraestructura energética solo puede construirse en sectores de desierto");
+        }
+
+        if (esDefensaSectorial(tipo) && sector.getTerrain() == TerrainType.PANTANO) {
+            throw new GameRuleViolationException("Las defensas no pueden construirse en pantano");
+        }
+
         SectorResource recursoRequerido = RECURSO_REQUERIDO.get(tipo);
         if (recursoRequerido == null) return; // PLACA_SOLAR, REACTOR_FUSION, etc. — sin restricción
 
@@ -235,5 +314,18 @@ public class EdificioService {
                 ", pero este sector tiene: " + recursoSector.name()
             );
         }
+    }
+
+    private boolean esInfraestructuraEnergetica(TipoEdificio tipo) {
+        return tipo == TipoEdificio.PLACA_SOLAR
+                || tipo == TipoEdificio.GENERADOR_NEON
+                || tipo == TipoEdificio.REACTOR_FUSION
+                || tipo == TipoEdificio.BATERIA_ENERGIA;
+    }
+
+    private boolean esDefensaSectorial(TipoEdificio tipo) {
+        return tipo == TipoEdificio.ESCUDO_SECTOR
+                || tipo == TipoEdificio.TORRETA_NEOCROMO
+                || tipo == TipoEdificio.CANON_HEXALIUM;
     }
 }

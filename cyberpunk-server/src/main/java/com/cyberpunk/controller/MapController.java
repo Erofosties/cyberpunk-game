@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cyberpunk.domain.map.MapSector;
+import com.cyberpunk.dto.SectorDetalleDTO;
 import com.cyberpunk.service.MapService;
 
 @RestController
@@ -24,10 +24,11 @@ public class MapController {
         return mapService.getMapaVisibleComoTexto(usuarioId);
     }
     @GetMapping("/sector")
-    public MapSector getSector(
+    public SectorDetalleDTO getSector(
+            @RequestParam Long usuarioId,
             @RequestParam int x,
             @RequestParam int y) {
 
-        return mapService.getOrGenerateSector(x, y);
+        return mapService.getSectorDetalle(usuarioId, x, y);
     }
 }
