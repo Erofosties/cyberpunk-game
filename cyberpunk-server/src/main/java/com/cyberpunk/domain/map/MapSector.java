@@ -1,9 +1,14 @@
 package com.cyberpunk.domain.map;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.edificio.Edificio.TipoEdificio;
 import com.cyberpunk.domain.usuario.Usuario;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +18,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -51,6 +57,10 @@ public class MapSector {
     @JsonIgnore
     private Usuario owner;
 
+    @OneToMany(mappedBy = "sectorNave")
+    @JsonIgnore
+    private final List<Colonia> coloniasConNave = new ArrayList<>();
+
     public MapSector() {}
 
     public MapSector(int x, int y, TerrainType terrain, SectorResource sectorResource, double richness) {
@@ -72,24 +82,81 @@ public class MapSector {
                 || building == TipoEdificio.CANON_HEXALIUM;
     }
 
+    @JsonIgnore
     public int getCantidadEscudosSector() {
         return building == TipoEdificio.ESCUDO_SECTOR ? Math.max(1, buildingLevel) : 0;
     }
 
+    @JsonIgnore
     public int getCantidadTorretasSector() {
         return building == TipoEdificio.TORRETA_NEOCROMO ? Math.max(1, buildingLevel) : 0;
     }
 
+    @JsonIgnore
     public int getCantidadCanonesSector() {
         return building == TipoEdificio.CANON_HEXALIUM ? Math.max(1, buildingLevel) : 0;
     }
 
+    @JsonIgnore
     public int getCantidadDefensasSector() {
         return getCantidadEscudosSector() + getCantidadTorretasSector() + getCantidadCanonesSector();
     }
 
+    @JsonIgnore
     public int getPenalizacionExploracionSector() {
         return getCantidadEscudosSector() * 2;
+    }
+
+    @JsonProperty("cantidadEscudosSector")
+    public int getCantidadEscudosSectorVista() {
+        Colonia coloniaNave = getColoniaConNave();
+        if (coloniaNave != null) {
+            return coloniaNave.getDefensas().getEscudos();
+        }
+
+        return getCantidadEscudosSector();
+    }
+
+    @JsonProperty("cantidadTorretasSector")
+    public int getCantidadTorretasSectorVista() {
+        Colonia coloniaNave = getColoniaConNave();
+        if (coloniaNave != null) {
+            return coloniaNave.getDefensas().getTorretasNeocromo();
+        }
+
+        return getCantidadTorretasSector();
+    }
+
+    @JsonProperty("cantidadCanonesSector")
+    public int getCantidadCanonesSectorVista() {
+        Colonia coloniaNave = getColoniaConNave();
+        if (coloniaNave != null) {
+            return coloniaNave.getDefensas().getCanonesHexalium();
+        }
+
+        return getCantidadCanonesSector();
+    }
+
+    @JsonProperty("cantidadDefensasSector")
+    public int getCantidadDefensasSectorVista() {
+        Colonia coloniaNave = getColoniaConNave();
+        if (coloniaNave != null) {
+            return coloniaNave.getDefensas().getEscudos()
+                    + coloniaNave.getDefensas().getTorretasNeocromo()
+                    + coloniaNave.getDefensas().getCanonesHexalium();
+        }
+
+        return getCantidadDefensasSector();
+    }
+
+    @JsonProperty("penalizacionExploracionSector")
+    public int getPenalizacionExploracionSectorVista() {
+        Colonia coloniaNave = getColoniaConNave();
+        if (coloniaNave != null) {
+            return coloniaNave.getDefensas().getPenalizacionExploracion();
+        }
+
+        return getPenalizacionExploracionSector();
     }
 
     public int calcularDanioConstanteDefensaSector() {
@@ -162,6 +229,24 @@ public class MapSector {
         this.owner = owner;
     }
 
+    public void addColoniaConNave(Colonia colonia) {
+        if (colonia == null) {
+            return;
+        }
+
+        if (!coloniasConNave.contains(colonia)) {
+            coloniasConNave.add(colonia);
+        }
+    }
+
+    public void removeColoniaConNave(Colonia colonia) {
+        if (colonia == null) {
+            return;
+        }
+
+        coloniasConNave.remove(colonia);
+    }
+
     public void setBuildingLevel(int buildingLevel) {
         this.buildingLevel = buildingLevel;
     }
@@ -172,6 +257,14 @@ public class MapSector {
             return;
         }
         this.generadorNeonActivo = generadorNeonActivo;
+    }
+
+    private Colonia getColoniaConNave() {
+        if (coloniasConNave.isEmpty()) {
+            return null;
+        }
+
+        return coloniasConNave.get(0);
     }
 
     // ================= ENUMS =================

@@ -153,7 +153,7 @@ public class EdificioService {
                 .orElseThrow(() -> new EntityNotFoundException("Construcción no encontrada"));
 
         MapSector origen = personaje.getSectorActual();
-        personaje.setSectorAsignado(null);
+        personaje.setSectorAsignado(construccion.getSectorDestino());
         personaje.setConstruccionAsignada(construccion);
         personaje.iniciarViaje(origen, TravelCalculator.calcularTicks(origen, construccion.getSectorDestino()));
 

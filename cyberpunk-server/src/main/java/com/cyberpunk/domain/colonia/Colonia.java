@@ -115,7 +115,15 @@ public class Colonia {
     }
 
     public void setSectorNave(MapSector sectorNave) {
+        if (this.sectorNave != null) {
+            this.sectorNave.removeColoniaConNave(this);
+        }
+
         this.sectorNave = sectorNave;
+
+        if (sectorNave != null) {
+            sectorNave.addColoniaConNave(this);
+        }
     }
 
     public void setRecursos(Recursos recursos) {
