@@ -1,15 +1,20 @@
 package com.cyberpunk.service;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.cyberpunk.domain.colonia.Colonia;
 import com.cyberpunk.domain.map.MapSector;
 import com.cyberpunk.domain.usuario.Usuario;
+import com.cyberpunk.exception.EntityNotFoundException;
 import com.cyberpunk.exception.GameRuleViolationException;
 import com.cyberpunk.repository.ColoniaRepository;
 import com.cyberpunk.repository.MapSectorRepository;
@@ -25,6 +30,7 @@ public class UsuarioService {
     private final MapService mapService;
     private final ExplorationService explorationService;
     private final ColoniaService coloniaService;
+    private final PasswordEncoder passwordEncoder;
 
     private final Random random = new Random();
 
@@ -35,7 +41,8 @@ public class UsuarioService {
             PersonajeService personajeService,
             MapService mapService,
             ExplorationService explorationService,
-            ColoniaService coloniaService) {
+            ColoniaService coloniaService,
+            PasswordEncoder passwordEncoder) {
 
         this.usuarioRepository = usuarioRepository;
         this.coloniaRepository = coloniaRepository;
@@ -44,20 +51,21 @@ public class UsuarioService {
         this.mapService = mapService;
         this.explorationService = explorationService;
         this.coloniaService = coloniaService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
     public Usuario crearUsuario(String username, String password) {
 
         if (usuarioRepository.findByUsername(username).isPresent()) {
-            throw new RuntimeException("El usuario ya existe");
+            throw new GameRuleViolationException("El usuario '" + username + "' ya existe");
         }
 
         // =========================
         // CREAR USUARIO
         // =========================
 
-        Usuario usuario = new Usuario(username, password);
+        Usuario usuario = new Usuario(username, passwordEncoder.encode(password));
         usuarioRepository.save(usuario);
 
         // =========================
@@ -135,15 +143,12 @@ public class UsuarioService {
                 .orElse(null);
     }
 
-    public List<Usuario> obtenerUsuarios() {
-        return usuarioRepository.findAll();
+    public Page<Usuario> obtenerUsuarios(Pageable pageable) {
+        return usuarioRepository.findAll(pageable);
     }
 
-    @SuppressWarnings("null")
     public Usuario obtenerUsuario(Long id) {
-        if (id == null) {
-            throw new IllegalArgumentException("El ID del usuario no puede ser null");
-        }
-        return usuarioRepository.findById(id).orElse(null);
+        return usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + id));
     }
 }

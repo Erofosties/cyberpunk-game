@@ -1,7 +1,9 @@
 package com.cyberpunk.controller;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
@@ -21,7 +23,6 @@ public class UsuarioController {
 
     @PostMapping
     public Usuario crearUsuario(@Valid @RequestBody CrearUsuarioRequest request) {
-
         return usuarioService.crearUsuario(
                 request.getUsername(),
                 request.getPassword()
@@ -29,8 +30,12 @@ public class UsuarioController {
     }
 
     @GetMapping
-    public List<Usuario> obtenerUsuarios() {
-        return usuarioService.obtenerUsuarios();
+    public Page<Usuario> obtenerUsuarios(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+        return usuarioService.obtenerUsuarios(pageable);
     }
 
     @GetMapping("/{id}")

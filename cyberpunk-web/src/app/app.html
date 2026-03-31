@@ -1,0 +1,264 @@
+<div class="layout">
+  <header class="topbar">
+    <div class="brand">
+      <h1>{{ title }}</h1>
+      <p>Consola de testeo integral para backend Cyberpunk</p>
+    </div>
+    <div class="connection-card">
+      <label>API Base URL</label>
+      <input [(ngModel)]="apiBase" />
+      <div class="token-state" [class.ok]="token()">
+        {{ token() ? 'Token cargado' : 'Sin token' }}
+      </div>
+      <button type="button" class="danger" (click)="logout()">Cerrar sesion</button>
+    </div>
+  </header>
+
+  <section class="command-deck">
+    <nav class="side-nav">
+      <button [class.active]="section() === 'auth'" (click)="setSection('auth')">Autenticacion</button>
+      <button [class.active]="section() === 'usuarios'" (click)="setSection('usuarios')">Usuarios</button>
+      <button [class.active]="section() === 'colonias'" (click)="setSection('colonias')">Colonias</button>
+      <button [class.active]="section() === 'mapa'" (click)="setSection('mapa')">Mapa</button>
+      <button [class.active]="section() === 'edificios'" (click)="setSection('edificios')">Edificios</button>
+      <button [class.active]="section() === 'personajes'" (click)="setSection('personajes')">Personajes</button>
+    </nav>
+
+    <main class="panel-zone">
+      <section class="card" *ngIf="section() === 'auth'">
+        <h2>Autenticacion</h2>
+        <div class="grid two">
+          <article class="subcard">
+            <h3>Registro</h3>
+            <label>Usuario</label>
+            <input [(ngModel)]="authRegister.username" placeholder="pilot_01" />
+            <label>Password</label>
+            <input [(ngModel)]="authRegister.password" type="password" placeholder="******" />
+            <button type="button" (click)="register()">POST /auth/register</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Login</h3>
+            <label>Usuario</label>
+            <input [(ngModel)]="authLogin.username" placeholder="pilot_01" />
+            <label>Password</label>
+            <input [(ngModel)]="authLogin.password" type="password" placeholder="******" />
+            <button type="button" (click)="login()">POST /auth/login</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" *ngIf="section() === 'usuarios'">
+        <h2>Usuarios</h2>
+        <div class="grid two">
+          <article class="subcard">
+            <h3>Listado paginado</h3>
+            <label>Pagina</label>
+            <input type="number" [(ngModel)]="usuariosForm.page" />
+            <label>Tamano</label>
+            <input type="number" [(ngModel)]="usuariosForm.size" />
+            <button type="button" (click)="getUsuarios()">GET /usuarios</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Detalle</h3>
+            <label>Usuario ID</label>
+            <input type="number" [(ngModel)]="usuariosForm.id" />
+            <button type="button" (click)="getUsuarioById()">GET /usuarios/&#123;id&#125;</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" *ngIf="section() === 'colonias'">
+        <h2>Colonias</h2>
+        <div class="grid two">
+          <article class="subcard">
+            <h3>Obtener colonia</h3>
+            <label>Colonia ID</label>
+            <input type="number" [(ngModel)]="coloniaForm.id" />
+            <button type="button" (click)="getColonia()">GET /colonias/&#123;id&#125;</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Desplegar nave</h3>
+            <label>X</label>
+            <input type="number" [(ngModel)]="coloniaForm.x" />
+            <label>Y</label>
+            <input type="number" [(ngModel)]="coloniaForm.y" />
+            <button type="button" (click)="desplegarNave()">POST /colonias/&#123;id&#125;/desplegar</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" *ngIf="section() === 'mapa'">
+        <h2>Mapa</h2>
+        <div class="grid two">
+          <article class="subcard">
+            <h3>Consultas de mapa</h3>
+            <label>Usuario ID</label>
+            <input type="number" [(ngModel)]="mapaForm.usuarioId" />
+            <button type="button" (click)="getMapaVisible()">GET /map/&#123;usuarioId&#125;</button>
+
+            <div class="inline-row">
+              <div>
+                <label>X</label>
+                <input type="number" [(ngModel)]="mapaForm.x" />
+              </div>
+              <div>
+                <label>Y</label>
+                <input type="number" [(ngModel)]="mapaForm.y" />
+              </div>
+            </div>
+            <button type="button" (click)="getSectorDetalle()">GET /map/sector</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Grid interactivo</h3>
+            <div class="inline-row">
+              <div>
+                <label>Centro X</label>
+                <input type="number" [(ngModel)]="mapaForm.centerX" />
+              </div>
+              <div>
+                <label>Centro Y</label>
+                <input type="number" [(ngModel)]="mapaForm.centerY" />
+              </div>
+            </div>
+
+            <div class="map-grid" [style.--cols]="(mapaForm.radius * 2) + 1">
+              <button
+                *ngFor="let cell of mapCells()"
+                type="button"
+                [class.center]="cell.isCenter"
+                (click)="clickSector(cell.x, cell.y)">
+                {{ cell.x }},{{ cell.y }}
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" *ngIf="section() === 'edificios'">
+        <h2>Edificios</h2>
+        <div class="grid three">
+          <article class="subcard">
+            <h3>Construccion</h3>
+            <label>Colonia ID</label>
+            <input type="number" [(ngModel)]="edificioForm.coloniaId" />
+            <label>Sector ID</label>
+            <input type="number" [(ngModel)]="edificioForm.sectorId" />
+            <label>Tipo de edificio</label>
+            <input [(ngModel)]="edificioForm.tipoEdificio" />
+            <button type="button" (click)="construirEdificio()">POST /edificios/construir</button>
+            <button type="button" (click)="verConstrucciones()">GET /edificios/construcciones/&#123;id&#125;</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Asignaciones</h3>
+            <label>Personaje ID</label>
+            <input type="number" [(ngModel)]="edificioForm.personajeId" />
+            <label>Construccion ID</label>
+            <input type="number" [(ngModel)]="edificioForm.construccionId" />
+            <button type="button" (click)="asignarConstruccion()">POST /edificios/asignar-construccion</button>
+            <button type="button" (click)="asignarTrabajo()">POST /edificios/asignar-trabajo</button>
+            <button type="button" class="danger" (click)="desasignarTrabajo()">POST /edificios/desasignar-trabajo/&#123;id&#125;</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Generador neon</h3>
+            <label>Activo</label>
+            <select [(ngModel)]="edificioForm.activo">
+              <option [ngValue]="true">true</option>
+              <option [ngValue]="false">false</option>
+            </select>
+            <button type="button" (click)="estadoGeneradorNeon()">POST /edificios/generador-neon/estado</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" *ngIf="section() === 'personajes'">
+        <h2>Personajes</h2>
+        <div class="grid three">
+          <article class="subcard">
+            <h3>Creacion</h3>
+            <label>Colonia ID</label>
+            <input type="number" [(ngModel)]="personajeForm.coloniaId" />
+            <label>Nombre</label>
+            <input [(ngModel)]="personajeForm.nombre" />
+            <button type="button" (click)="crearPersonaje()">POST /personajes</button>
+            <button type="button" (click)="crearTrabajador()">POST /personajes/trabajador</button>
+            <button type="button" (click)="crearGuerrero()">POST /personajes/guerrero</button>
+          </article>
+
+          <article class="subcard">
+            <h3>Habilidades</h3>
+            <label>Fuerza / Destreza / Resistencia / Hackeo</label>
+            <div class="inline-row four">
+              <input type="number" [(ngModel)]="personajeForm.fuerza" />
+              <input type="number" [(ngModel)]="personajeForm.destreza" />
+              <input type="number" [(ngModel)]="personajeForm.resistencia" />
+              <input type="number" [(ngModel)]="personajeForm.hackeo" />
+            </div>
+            <label>Mineria / Agricultura / Ciencia / Ingenieria</label>
+            <div class="inline-row four">
+              <input type="number" [(ngModel)]="personajeForm.mineria" />
+              <input type="number" [(ngModel)]="personajeForm.agricultura" />
+              <input type="number" [(ngModel)]="personajeForm.ciencia" />
+              <input type="number" [(ngModel)]="personajeForm.ingenieria" />
+            </div>
+          </article>
+
+          <article class="subcard">
+            <h3>Acciones</h3>
+            <label>Usuario ID</label>
+            <input type="number" [(ngModel)]="personajeForm.usuarioId" />
+            <label>IDs guerreros (1,2,3)</label>
+            <input [(ngModel)]="personajeForm.guerreroIds" />
+            <div class="inline-row">
+              <div>
+                <label>X</label>
+                <input type="number" [(ngModel)]="personajeForm.x" />
+              </div>
+              <div>
+                <label>Y</label>
+                <input type="number" [(ngModel)]="personajeForm.y" />
+              </div>
+            </div>
+            <button type="button" (click)="desplegarGuerreros()">POST /personajes/guerreros/desplegar</button>
+
+            <label>Guerrero ID</label>
+            <input type="number" [(ngModel)]="personajeForm.guerreroId" />
+            <button type="button" (click)="retirarGuerrero()">POST /personajes/guerreros/&#123;id&#125;/retirar</button>
+
+            <label>Personaje ID</label>
+            <input type="number" [(ngModel)]="personajeForm.personajeId" />
+            <button type="button" (click)="usarNanocura()">POST /personajes/&#123;id&#125;/nanocura</button>
+            <button type="button" (click)="usarFlorsomnio()">POST /personajes/&#123;id&#125;/florsomnio</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="telemetry">
+        <div class="status-line">
+          <div class="dot" [class.loading]="loading()"></div>
+          <span>{{ status() }}</span>
+        </div>
+        <div class="grid two">
+          <article class="subcard response">
+            <h3>Respuesta</h3>
+            <pre>{{ lastResponse() }}</pre>
+          </article>
+          <article class="subcard logs">
+            <div class="logs-header">
+              <h3>Historial</h3>
+              <button type="button" (click)="clearLog()">Limpiar</button>
+            </div>
+            <ul>
+              <li *ngFor="let line of history()">{{ line }}</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </section>
+</div>

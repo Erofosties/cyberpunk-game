@@ -10,5 +10,4 @@ import com.cyberpunk.domain.personaje.Personaje;
 public interface PersonajeRepository extends JpaRepository<Personaje, Long> {
 
     List<Personaje> findByColonia(Colonia colonia);
-
 }
